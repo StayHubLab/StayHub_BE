@@ -1,6 +1,5 @@
 /**
  * @fileoverview User Routes - Handles user profile management
- * @author TienTP
  * @created 2025-05-29
  * @file user.routes.js
  * @description This file defines the routes for user profile management.

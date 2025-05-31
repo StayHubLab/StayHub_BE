@@ -1,6 +1,5 @@
 /**
  * @fileoverview Validation Utility - Handles validation for the application
- * @author TienTP
  * @created 2025-05-29
  * @file validation.js
  * @description This file defines the validation utility for the application.

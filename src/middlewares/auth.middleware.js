@@ -1,6 +1,5 @@
 /**
  * @fileoverview Authentication Middleware - Handles user authentication
- * @author TienTP
  * @created 2025-05-29
  * @file auth.middleware.js
  * @description This file defines the authentication middleware for the application.

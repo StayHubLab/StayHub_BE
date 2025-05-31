@@ -1,6 +1,5 @@
 /**
  * @fileoverview Authentication Controller - Handles HTTP requests for user authentication
- * @author TienTP
  * @created 2025-05-29
  * @file auth.controller.js
  * @description This controller manages user authentication endpoints including registration,
@@ -10,6 +9,7 @@
 
 const AuthService = require('../services/auth.service');
 const logger = require('../utils/logger');
+const { validateEmail, validatePhone, validatePassword } = require('../validations/validation');
 
 const formatResponse = (res, { success = true, message, data = null, status = 200 }) => {
   return res.status(status).json({ success, message, ...(data && { data }) });
@@ -84,6 +84,32 @@ const cookieOptions = {
  */
 exports.register = async (req, res) => {
   try {
+    const { email, password, phone, name, address } = req.body;
+
+    // Validate required fields
+    if (!email || !password || !phone || !name || !address) {
+      throw { code: 'MISSING_FIELDS', message: 'All fields are required' };
+    }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      throw { code: 'INVALID_EMAIL', message: 'Invalid email format' };
+    }
+
+    // Validate phone format
+    if (!validatePhone(phone)) {
+      throw { code: 'INVALID_PHONE', message: 'Invalid phone format' };
+    }
+
+    // Validate password strength
+    if (!validatePassword(password)) {
+      throw {
+        code: 'INVALID_PASSWORD',
+        message:
+          'Password must be at least 8 characters long and contain uppercase, lowercase, number and special character',
+      };
+    }
+
     const result = await AuthService.register(req.body);
     return formatResponse(res, {
       status: 201,
@@ -107,23 +133,27 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password)
+
+    // Validate required fields
+    if (!email || !password) {
       throw { code: 'MISSING_FIELDS', message: 'Email and password are required' };
+    }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      throw { code: 'INVALID_EMAIL', message: 'Invalid email format' };
+    }
+
     const result = await AuthService.login(email, password);
 
+    // Set secure cookies
     res.cookie('token', result.token, {
       ...cookieOptions,
-      maxAge: 15 * 60 * 1000,
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000, // 15 minutes
     });
     res.cookie('refreshToken', result.refreshToken, {
       ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     return formatResponse(res, {
@@ -149,11 +179,17 @@ exports.login = async (req, res) => {
  */
 exports.logout = async (req, res) => {
   try {
-    if (!req.user?._id) throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    if (!req.user?._id) {
+      throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    }
+
     const token = validateToken(req);
     await AuthService.logout(req.user._id, token);
+
+    // Clear cookies
     res.clearCookie('token', cookieOptions);
     res.clearCookie('refreshToken', cookieOptions);
+
     return formatResponse(res, { message: 'Logged out successfully' });
   } catch (error) {
     handleError(error, res, 'Logout');
@@ -169,7 +205,10 @@ exports.logout = async (req, res) => {
  */
 exports.getProfile = async (req, res) => {
   try {
-    if (!req.user?._id) throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    if (!req.user?._id) {
+      throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    }
+
     validateToken(req);
     const user = await AuthService.getUserProfile(req.user._id);
     return formatResponse(res, { message: 'Profile retrieved successfully', data: user });
@@ -188,8 +227,17 @@ exports.getProfile = async (req, res) => {
  */
 exports.updateProfile = async (req, res) => {
   try {
-    if (!req.user?._id) throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    if (!req.user?._id) {
+      throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    }
+
     validateToken(req);
+
+    // Validate phone if provided
+    if (req.body.phone && !validatePhone(req.body.phone)) {
+      throw { code: 'INVALID_PHONE', message: 'Invalid phone format' };
+    }
+
     const updatedUser = await AuthService.updateProfile(req.user._id, req.body);
     return formatResponse(res, { message: 'Profile updated successfully', data: updatedUser });
   } catch (error) {
@@ -206,6 +254,10 @@ exports.updateProfile = async (req, res) => {
  */
 exports.verifyEmail = async (req, res) => {
   try {
+    if (!req.params.token) {
+      throw { code: 'INVALID_TOKEN', message: 'Verification token is required' };
+    }
+
     const result = await AuthService.verifyEmail(req.params.token);
     return formatResponse(res, { message: 'Email verified successfully', data: result });
   } catch (error) {
@@ -223,7 +275,17 @@ exports.verifyEmail = async (req, res) => {
  */
 exports.sendVerificationEmail = async (req, res) => {
   try {
-    const result = await AuthService.sendVerificationEmail(req.body.email);
+    const { email } = req.body;
+
+    if (!email) {
+      throw { code: 'MISSING_FIELDS', message: 'Email is required' };
+    }
+
+    if (!validateEmail(email)) {
+      throw { code: 'INVALID_EMAIL', message: 'Invalid email format' };
+    }
+
+    const result = await AuthService.sendVerificationEmail(email);
     return formatResponse(res, { message: 'Verification email sent successfully', data: result });
   } catch (error) {
     handleError(error, res, 'Send verification email');
@@ -240,7 +302,17 @@ exports.sendVerificationEmail = async (req, res) => {
  */
 exports.resendVerificationEmail = async (req, res) => {
   try {
-    const result = await AuthService.resendVerificationEmail(req.body.email);
+    const { email } = req.body;
+
+    if (!email) {
+      throw { code: 'MISSING_FIELDS', message: 'Email is required' };
+    }
+
+    if (!validateEmail(email)) {
+      throw { code: 'INVALID_EMAIL', message: 'Invalid email format' };
+    }
+
+    const result = await AuthService.resendVerificationEmail(email);
     return formatResponse(res, { message: 'Verification email sent successfully', data: result });
   } catch (error) {
     handleError(error, res, 'Resend verification email');
@@ -259,12 +331,31 @@ exports.resendVerificationEmail = async (req, res) => {
  */
 exports.changePassword = async (req, res) => {
   try {
-    if (!req.user?._id) throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
-    validateToken(req);
+    if (!req.user?._id) {
+      throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    }
+
     const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      throw { code: 'MISSING_FIELDS', message: 'Old password and new password are required' };
+    }
+
+    if (!validatePassword(newPassword)) {
+      throw {
+        code: 'INVALID_PASSWORD',
+        message:
+          'New password must be at least 8 characters long and contain uppercase, lowercase, number and special character',
+      };
+    }
+
+    validateToken(req);
     const result = await AuthService.changePassword(req.user._id, oldPassword, newPassword);
+
+    // Clear cookies after password change
     res.clearCookie('token', cookieOptions);
     res.clearCookie('refreshToken', cookieOptions);
+
     return formatResponse(res, { message: 'Password changed successfully', data: result });
   } catch (error) {
     handleError(error, res, 'Change password');
@@ -281,7 +372,17 @@ exports.changePassword = async (req, res) => {
  */
 exports.forgotPassword = async (req, res) => {
   try {
-    const result = await AuthService.forgotPassword(req.body.email);
+    const { email } = req.body;
+
+    if (!email) {
+      throw { code: 'MISSING_FIELDS', message: 'Email is required' };
+    }
+
+    if (!validateEmail(email)) {
+      throw { code: 'INVALID_EMAIL', message: 'Invalid email format' };
+    }
+
+    const result = await AuthService.forgotPassword(email);
     return formatResponse(res, { message: 'Password reset email sent successfully', data: result });
   } catch (error) {
     handleError(error, res, 'Forgot password');
@@ -300,9 +401,25 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      throw { code: 'MISSING_FIELDS', message: 'Token and new password are required' };
+    }
+
+    if (!validatePassword(newPassword)) {
+      throw {
+        code: 'INVALID_PASSWORD',
+        message:
+          'New password must be at least 8 characters long and contain uppercase, lowercase, number and special character',
+      };
+    }
+
     const result = await AuthService.resetPassword(token, newPassword);
-    res.clearCookie('token');
-    res.clearCookie('refreshToken');
+
+    // Clear cookies after password reset
+    res.clearCookie('token', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
+
     return formatResponse(res, { message: 'Password reset successfully', data: result });
   } catch (error) {
     handleError(error, res, 'Reset password');
@@ -319,12 +436,24 @@ exports.resetPassword = async (req, res) => {
  */
 exports.refreshToken = async (req, res) => {
   try {
-    const result = await AuthService.refreshToken(req.body.refreshToken);
-    res.cookie('token', result.token, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      throw { code: 'MISSING_FIELDS', message: 'Refresh token is required' };
+    }
+
+    const result = await AuthService.refreshToken(refreshToken);
+
+    // Set new cookies
+    res.cookie('token', result.token, {
+      ...cookieOptions,
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
     res.cookie('refreshToken', result.refreshToken, {
       ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
+
     return formatResponse(res, {
       message: 'Token refreshed successfully',
       data: {
@@ -347,11 +476,17 @@ exports.refreshToken = async (req, res) => {
  */
 exports.revokeToken = async (req, res) => {
   try {
-    if (!req.user?._id) throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    if (!req.user?._id) {
+      throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
+    }
+
     const token = validateToken(req);
     const result = await AuthService.revokeToken(token);
+
+    // Clear cookies
     res.clearCookie('token', cookieOptions);
     res.clearCookie('refreshToken', cookieOptions);
+
     return formatResponse(res, { message: 'Token revoked successfully', data: result });
   } catch (error) {
     handleError(error, res, 'Revoke token');

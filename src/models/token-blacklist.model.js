@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Token Blacklist Model - Handles token blacklist
+ * @created 2025-05-29
+ * @file token-blacklist.model.js
+ * @description This file defines the token blacklist model for the application.
+ */
+
 const mongoose = require('mongoose');
 
 const tokenBlacklistSchema = new mongoose.Schema(

@@ -1,6 +1,5 @@
 /**
  * @fileoverview User Model - Defines the user schema and methods
- * @author TienTP
  * @created 2025-05-29
  * @file user.model.js
  * @description This file defines the user schema and methods.
@@ -50,7 +49,9 @@ const userSchema = new mongoose.Schema(
       minlength: [8, 'Password must be at least 8 characters long'],
       validate: {
         validator: function (v) {
-          return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(v);
+          return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])[A-Za-z\d!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]{8,}$/.test(
+            v
+          );
         },
         message:
           'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character',

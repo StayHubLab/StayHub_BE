@@ -1,6 +1,5 @@
 /**
  * @fileoverview Database Configuration - Handles database connection
- * @author TienTP
  * @created 2025-05-29
  * @file database.js
  * @description This file defines the database configuration for the application.

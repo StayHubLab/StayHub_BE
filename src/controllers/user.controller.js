@@ -1,6 +1,5 @@
 /**
  * @fileoverview User Controller - Handles user profile management
- * @author TienTP
  * @created 2025-05-29
  * @file user.controller.js
  * @description This file defines the controller for user profile management.

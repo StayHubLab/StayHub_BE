@@ -1,6 +1,5 @@
 /**
  * @fileoverview Error Middleware - Handles error responses for the application
- * @author TienTP
  * @created 2025-05-29
  * @file error.middleware.js
  * @description This file defines the error middleware for the application.

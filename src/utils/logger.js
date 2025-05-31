@@ -1,6 +1,5 @@
 /**
  * @fileoverview Logger Utility - Handles logging for the application
- * @author TienTP
  * @created 2025-05-29
  * @file logger.js
  * @description This file defines the logger utility for the application.

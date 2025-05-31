@@ -1,6 +1,5 @@
 /**
  * @fileoverview Main Application File - Initializes the Express application and sets up middleware
- * @author TienTP
  * @created 2025-05-29
  * @file app.js
  * @description This file is the entry point for the application. It sets up the Express application,
@@ -17,6 +16,7 @@ const logger = require('./utils/logger');
 
 const userRoutes = require('./routes/user.routes');
 const authRoutes = require('./routes/auth.routes');
+const emailRoutes = require('./routes/email.routes');
 const { auth } = require('./middlewares/auth.middleware');
 
 const app = express();
@@ -50,6 +50,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', auth, userRoutes);
+app.use('/api/email', emailRoutes);
 
 // Error handling
 app.use((err, req, res, _next) => {
