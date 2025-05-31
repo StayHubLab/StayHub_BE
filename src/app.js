@@ -13,6 +13,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const logger = require('./utils/logger');
+const { errorHandler } = require('./middlewares/error.middleware');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
@@ -21,71 +22,125 @@ const emailRoutes = require('./routes/email.routes');
 const landlordRoutes = require('./routes/landlord.routes');
 const renterRoutes = require('./routes/renter.routes');
 const adminRoutes = require('./routes/admin.routes');
+const buildingRoutes = require('./routes/building.routes');
 
 // Import middleware
 const { auth } = require('./middlewares/auth.middleware');
-const errorHandler = require('./middlewares/error.middleware');
 
 const app = express();
 
-// Rate limiting
+// Security middleware
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ['self'],
+        scriptSrc: ['self', 'unsafe-inline'],
+        styleSrc: ['self', 'unsafe-inline'],
+        imgSrc: ['self', 'data:', 'https:'],
+        connectSrc: ['self'],
+      },
+    },
+  })
+);
+
+// Rate limiting with optimized settings
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
-// Middlewares
-app.use(helmet());
-app.use(limiter); // Apply rate limiting to all routes
+// Apply rate limiting to all routes
+app.use(limiter);
+
+// CORS configuration
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true, // Allow cookies
+    credentials: true,
+    maxAge: 86400, // 24 hours
   })
 );
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check endpoint
+// Body parsing middleware with optimized settings
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: '10mb',
+    parameterLimit: 10000,
+  })
+);
+
+// Health check endpoint with detailed status
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+  });
 });
 
-// Routes
-// Public routes - No authentication required
+// API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', auth, userRoutes);
+app.use('/api/email', auth, emailRoutes);
+app.use('/api/landlord', auth, landlordRoutes);
+app.use('/api/renter', auth, renterRoutes);
+app.use('/api/admin', auth, adminRoutes);
+app.use('/api/buildings', buildingRoutes);
 
-// Protected routes - Authentication required
-app.use('/api/users', auth, userRoutes); // User profile management
-app.use('/api/email', auth, emailRoutes); // Email management
-
-// Role-based routes - Authentication and specific role required
-app.use('/api/landlord', auth, landlordRoutes); // Landlord specific routes
-app.use('/api/renter', auth, renterRoutes); // Renter specific routes
-app.use('/api/admin', auth, adminRoutes); // Admin specific routes
-
-// Error handling
+// Error handling middleware
 app.use(errorHandler);
 
-// Start server function
+// Start server function with improved error handling
 const startServer = async () => {
   try {
-    // Connect to MongoDB
-    await connectDB();
+    console.log('Starting server initialization...');
+    console.log('Environment variables check:', {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      MONGODB_URI: process.env.MONGODB_URI ? 'URI is set' : 'URI is not set',
+      CORS_ORIGIN: process.env.CORS_ORIGIN,
+    });
 
-    // Start server
+    await connectDB();
     const PORT = process.env.PORT || 3000;
-    app
-      .listen(PORT, () => {
-        logger.info(`Server is running on port ${PORT}`);
-      })
-      .on('error', (error) => {
-        logger.error('Server failed to start:', { error: error.message, stack: error.stack });
-        process.exit(1);
+
+    const server = app.listen(PORT, () => {
+      logger.info(`Server is running on port ${PORT}`);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      logger.info('SIGTERM received. Shutting down gracefully...');
+      server.close(() => {
+        logger.info('Process terminated');
+        process.exit(0);
       });
+    });
+
+    server.on('error', (error) => {
+      logger.error('Server failed to start:', {
+        error: error.message,
+        stack: error.stack,
+        code: error.code,
+      });
+      process.exit(1);
+    });
   } catch (error) {
     logger.error('Application startup failed:', {
       error: error.message,
