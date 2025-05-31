@@ -5,9 +5,11 @@
  * @description This file defines the error middleware for the application.
  */
 
+const logger = require('../utils/logger');
+
 const errorHandler = (err, req, res, _next) => {
   // Log error for debugging
-  console.error(err.stack);
+  logger.error(err.stack);
 
   // Determine status code and message
   const statusCode = err.statusCode || 500;

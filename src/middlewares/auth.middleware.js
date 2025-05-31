@@ -23,7 +23,10 @@ const auth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { _id: decoded.userId };
+    req.user = {
+      _id: decoded.userId,
+      role: decoded.role,
+    };
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
@@ -44,8 +47,16 @@ const auth = async (req, res, next) => {
 
 const roleMiddleware = (...roles) => {
   return (req, res, next) => {
+    if (!req.user || !req.user.role) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
+        success: false,
         message: 'You do not have permission to perform this action',
       });
     }

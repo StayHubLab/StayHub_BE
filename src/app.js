@@ -14,10 +14,17 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const logger = require('./utils/logger');
 
-const userRoutes = require('./routes/user.routes');
+// Import routes
 const authRoutes = require('./routes/auth.routes');
+const userRoutes = require('./routes/user.routes');
 const emailRoutes = require('./routes/email.routes');
+const landlordRoutes = require('./routes/landlord.routes');
+const renterRoutes = require('./routes/renter.routes');
+const adminRoutes = require('./routes/admin.routes');
+
+// Import middleware
 const { auth } = require('./middlewares/auth.middleware');
+const errorHandler = require('./middlewares/error.middleware');
 
 const app = express();
 
@@ -48,18 +55,20 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
+// Public routes - No authentication required
 app.use('/api/auth', authRoutes);
-app.use('/api/users', auth, userRoutes);
-app.use('/api/email', emailRoutes);
+
+// Protected routes - Authentication required
+app.use('/api/users', auth, userRoutes); // User profile management
+app.use('/api/email', auth, emailRoutes); // Email management
+
+// Role-based routes - Authentication and specific role required
+app.use('/api/landlord', auth, landlordRoutes); // Landlord specific routes
+app.use('/api/renter', auth, renterRoutes); // Renter specific routes
+app.use('/api/admin', auth, adminRoutes); // Admin specific routes
 
 // Error handling
-app.use((err, req, res, _next) => {
-  logger.error('Unhandled error:', { error: err.message, stack: err.stack });
-  res.status(500).json({
-    status: 'error',
-    message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
-  });
-});
+app.use(errorHandler);
 
 // Start server function
 const startServer = async () => {
