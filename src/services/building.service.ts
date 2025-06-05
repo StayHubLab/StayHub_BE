@@ -1,13 +1,50 @@
 /**
  * @fileoverview Building Service - Handles building operations
  * @created 2025-05-29
- * @file building.service.js
+ * @file building.service.ts
  * @description Service for managing building data and operations
  */
 
-const Building = require('../models/building.model');
-const logger = require('../utils/logger');
-const { NotFoundError, ValidationError } = require('../utils/errors');
+import Building from '../models/building.model';
+import logger from '../utils/logger';
+import { NotFoundError, ValidationError } from '../utils/errors';
+
+interface BuildingData {
+  name: string;
+  location?: string;
+  status?: string;
+  [key: string]: any;
+}
+
+interface SearchCriteria {
+  name?: string;
+  location?: string;
+  [key: string]: any;
+}
+
+interface PaginationOptions {
+  page?: number;
+  limit?: number;
+  filters?: Record<string, any>;
+}
+
+interface PaginationResult {
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+interface BuildingsResponse {
+  buildings: BuildingData[];
+  pagination: PaginationResult;
+}
+
+interface BuildingStats {
+  totalBuildings: number;
+  activeBuildings: number;
+  inactiveBuildings: number;
+}
 
 /**
  * @class BuildingService
@@ -17,13 +54,14 @@ class BuildingService {
   /**
    * @route GET /api/buildings
    * @description Get all buildings with pagination and filters
-   * @param {Object} options - Query options
-   * @param {number} options.page - Page number
-   * @param {number} options.limit - Items per page
-   * @param {Object} options.filters - Filter criteria
-   * @returns {Promise<Object>} Buildings data with pagination
+   * @param options - Query options
+   * @returns Buildings data with pagination
    */
-  static async getAllBuildings({ page = 1, limit = 10, filters = {} } = {}) {
+  static async getAllBuildings({
+    page = 1,
+    limit = 10,
+    filters = {},
+  }: PaginationOptions = {}): Promise<BuildingsResponse> {
     try {
       const skip = (page - 1) * limit;
       const query = Building.find(filters);
@@ -51,11 +89,11 @@ class BuildingService {
   /**
    * @route GET /api/buildings/:id
    * @description Get building by id
-   * @param {string} buildingId - Building id
-   * @returns {Promise<Object>} Building data
+   * @param buildingId - Building id
+   * @returns Building data
    * @throws {NotFoundError} If building not found
    */
-  static async getBuildingById(buildingId) {
+  static async getBuildingById(buildingId: string): Promise<BuildingData> {
     try {
       if (!buildingId) {
         throw new ValidationError('Building ID is required');
@@ -77,10 +115,10 @@ class BuildingService {
   /**
    * @route POST /api/buildings
    * @description Create a new building
-   * @param {Object} buildingData - Building data
-   * @returns {Promise<Object>} Created building
+   * @param buildingData - Building data
+   * @returns Created building
    */
-  static async createBuilding(buildingData) {
+  static async createBuilding(buildingData: BuildingData): Promise<BuildingData> {
     try {
       if (!buildingData) {
         throw new ValidationError('Building data is required');
@@ -99,12 +137,15 @@ class BuildingService {
   /**
    * @route PUT /api/buildings/:id
    * @description Update a building
-   * @param {string} buildingId - Building id
-   * @param {Object} updateData - Update data
-   * @returns {Promise<Object>} Updated building
+   * @param buildingId - Building id
+   * @param updateData - Update data
+   * @returns Updated building
    * @throws {NotFoundError} If building not found
    */
-  static async updateBuilding(buildingId, updateData) {
+  static async updateBuilding(
+    buildingId: string,
+    updateData: Partial<BuildingData>
+  ): Promise<BuildingData> {
     try {
       if (!buildingId) {
         throw new ValidationError('Building ID is required');
@@ -130,11 +171,10 @@ class BuildingService {
   /**
    * @route DELETE /api/buildings/:id
    * @description Delete a building
-   * @param {string} buildingId - Building id
-   * @returns {Promise<void>}
+   * @param buildingId - Building id
    * @throws {NotFoundError} If building not found
    */
-  static async deleteBuilding(buildingId) {
+  static async deleteBuilding(buildingId: string): Promise<void> {
     try {
       if (!buildingId) {
         throw new ValidationError('Building ID is required');
@@ -154,12 +194,12 @@ class BuildingService {
   /**
    * @route GET /api/buildings/search
    * @description Search buildings by criteria
-   * @param {Object} searchCriteria - Search criteria
-   * @returns {Promise<Array>} Matching buildings
+   * @param searchCriteria - Search criteria
+   * @returns Matching buildings
    */
-  static async searchBuildings(searchCriteria) {
+  static async searchBuildings(searchCriteria: SearchCriteria): Promise<BuildingData[]> {
     try {
-      const query = {};
+      const query: Record<string, any> = {};
 
       if (searchCriteria.name) {
         query.name = { $regex: searchCriteria.name, $options: 'i' };
@@ -180,9 +220,9 @@ class BuildingService {
   /**
    * @route GET /api/buildings/stats
    * @description Get building statistics
-   * @returns {Promise<Object>} Building statistics
+   * @returns Building statistics
    */
-  static async getBuildingStats() {
+  static async getBuildingStats(): Promise<BuildingStats> {
     try {
       const [totalBuildings, activeBuildings] = await Promise.all([
         Building.countDocuments(),
@@ -201,4 +241,4 @@ class BuildingService {
   }
 }
 
-module.exports = BuildingService;
+export default BuildingService;

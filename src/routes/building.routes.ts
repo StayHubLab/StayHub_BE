@@ -6,24 +6,26 @@
  * It includes routes for building registration, login, logout, profile management, and email verification.
  */
 
-const express = require('express');
+import express from 'express';
+import * as buildingController from '../controllers/building.controller';
+import { auth } from '../middlewares/auth.middleware';
+
 const router = express.Router();
 const {
   getAllBuildings,
   getBuildingById,
-  // createBuilding,
+  createBuilding,
   // updateBuilding,
   // deleteBuilding,
-} = require('../controllers/building.controller');
-// const { auth } = require('../middlewares/auth.middleware');
+} = buildingController;
 
 // Public routes
 router.get('/', getAllBuildings);
 router.get('/:id', getBuildingById);
 
 // Protected routes
-// router.post('/', auth, createBuilding);
+router.post('/', auth, createBuilding);
 // router.put('/:id', auth, updateBuilding);
 // router.delete('/:id', auth, deleteBuilding);
 
-module.exports = router;
+export default router;

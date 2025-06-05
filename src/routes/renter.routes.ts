@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
+import { auth, roleMiddleware } from '../middlewares/auth.middleware';
 const router = express.Router();
-const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 
 // Booking management
 router.get('/bookings', auth, roleMiddleware('renter'), (req, res) => {
@@ -37,4 +37,4 @@ router.get('/dashboard', auth, roleMiddleware('renter'), (req, res) => {
   res.json({ message: 'Renter dashboard' });
 });
 
-module.exports = router;
+export default router;

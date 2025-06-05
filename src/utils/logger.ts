@@ -1,13 +1,13 @@
 /**
  * @fileoverview Logger Utility - Handles logging for the application
  * @created 2025-05-29
- * @file logger.js
+ * @file logger.ts
  * @description This file defines the logger utility for the application.
  */
 
-const winston = require('winston');
-const path = require('path');
-require('winston-daily-rotate-file');
+import winston from 'winston';
+import path from 'path';
+import 'winston-daily-rotate-file';
 
 // Define log format
 const logFormat = winston.format.combine(
@@ -45,22 +45,22 @@ const logger = winston.createLogger({
     fileRotateTransport,
     new winston.transports.File({
       filename: path.join('logs', 'combined.log'),
-      maxSize: '20m',
-      maxFiles: '14d',
+      maxsize: 20 * 1024 * 1024, // 20MB in bytes
+      maxFiles: 14,
     }),
   ],
   exceptionHandlers: [
     new winston.transports.File({
       filename: path.join('logs', 'exceptions.log'),
-      maxSize: '20m',
-      maxFiles: '14d',
+      maxsize: 20 * 1024 * 1024,
+      maxFiles: 14,
     }),
   ],
   rejectionHandlers: [
     new winston.transports.File({
       filename: path.join('logs', 'rejections.log'),
-      maxSize: '20m',
-      maxFiles: '14d',
+      maxsize: 20 * 1024 * 1024,
+      maxFiles: 14,
     }),
   ],
 });
@@ -75,8 +75,12 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Create a stream object for Morgan
-logger.stream = {
-  write: (message) => logger.info(message.trim()),
-};
+interface Stream {
+  write: (message: string) => void;
+}
 
-module.exports = logger;
+(logger as any).stream = {
+  write: (message: string) => logger.info(message.trim()),
+} as Stream;
+
+export default logger;

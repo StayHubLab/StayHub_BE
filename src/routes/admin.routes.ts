@@ -5,10 +5,10 @@
  * @description This file defines the routes for system administration.
  */
 
-const express = require('express');
+import express from 'express';
+import * as userController from '../controllers/user.controller';
+import { auth, roleMiddleware } from '../middlewares/auth.middleware';
 const router = express.Router();
-const userController = require('../controllers/user.controller');
-const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 
 // User Management
 router.get('/users', auth, roleMiddleware('admin'), userController.getUsers);
@@ -29,4 +29,4 @@ router.get('/dashboard', auth, roleMiddleware('admin'), (req, res) => {
   res.json({ message: 'Admin dashboard' });
 });
 
-module.exports = router;
+export default router;

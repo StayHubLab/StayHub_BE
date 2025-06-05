@@ -5,13 +5,13 @@
  * @description This file defines the routes for user profile management.
  */
 
-const express = require('express');
+import express from 'express';
+import * as userController from '../controllers/user.controller';
+import { auth } from '../middlewares/auth.middleware';
 const router = express.Router();
-const userController = require('../controllers/user.controller');
-const { auth } = require('../middlewares/auth.middleware');
 
 // Basic user routes
 router.get('/profile', auth, userController.getProfile);
 router.put('/profile', auth, userController.updateProfile);
 
-module.exports = router;
+export default router;

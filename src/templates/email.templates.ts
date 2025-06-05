@@ -5,7 +5,12 @@
  * @description This file defines all email templates used in the application.
  */
 
-const emailTemplates = {
+interface EmailTemplate {
+  subject: string;
+  getContent: (data: Record<string, any>) => string;
+}
+
+const emailTemplates: Record<string, EmailTemplate> = {
   /**
    * Test email template
    */
@@ -137,4 +142,4 @@ const emailTemplates = {
   },
 };
 
-module.exports = emailTemplates;
+export default emailTemplates;

@@ -5,12 +5,20 @@
  * @description This file defines the controller for user profile management.
  */
 
-const User = require('../models/user.model');
-const createError = require('http-errors');
+import { Request, Response, NextFunction } from 'express';
+import User from '../models/user.model';
+import createError from 'http-errors';
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    _id: string;
+    [key: string]: any;
+  };
+}
 
 // Helper function for consistent response format
-const sendResponse = (res, data, message = 'Success') => {
-  res.json({
+const sendResponse = (res: Response, data: any, message = 'Success'): Response => {
+  return res.json({
     success: true,
     message,
     data,
@@ -18,7 +26,7 @@ const sendResponse = (res, data, message = 'Success') => {
 };
 
 // Get all users
-exports.getUsers = async (req, res, next) => {
+export const getUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const users = await User.find().select('-password');
     sendResponse(res, users, 'Users retrieved successfully');
@@ -28,7 +36,11 @@ exports.getUsers = async (req, res, next) => {
 };
 
 // Get user by ID
-exports.getUserById = async (req, res, next) => {
+export const getUserById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) {
@@ -41,7 +53,11 @@ exports.getUserById = async (req, res, next) => {
 };
 
 // Update user
-exports.updateUser = async (req, res, next) => {
+export const updateUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const updateData = { ...req.body };
     delete updateData.password;
@@ -62,7 +78,11 @@ exports.updateUser = async (req, res, next) => {
 };
 
 // Delete user
-exports.deleteUser = async (req, res, next) => {
+export const deleteUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) {
@@ -75,9 +95,13 @@ exports.deleteUser = async (req, res, next) => {
 };
 
 // Get user profile
-exports.getProfile = async (req, res, next) => {
+export const getProfile = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findById(req.user?._id).select('-password');
     if (!user) {
       throw createError(404, 'User not found');
     }
@@ -88,12 +112,16 @@ exports.getProfile = async (req, res, next) => {
 };
 
 // Update user profile
-exports.updateProfile = async (req, res, next) => {
+export const updateProfile = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const updateData = { ...req.body };
     delete updateData.password;
 
-    const user = await User.findByIdAndUpdate(req.user._id, updateData, {
+    const user = await User.findByIdAndUpdate(req.user?._id, updateData, {
       new: true,
       runValidators: true,
     }).select('-password');

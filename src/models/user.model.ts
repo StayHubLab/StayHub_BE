@@ -1,16 +1,60 @@
 /**
  * @fileoverview User Model - Defines the user schema and methods
  * @created 2025-05-29
- * @file user.model.js
+ * @file user.model.ts
  * @description This file defines the user schema and methods.
  */
 
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { validateEmail, validatePhone } = require('../validations/validation');
+import { Document, Model, model, Schema } from 'mongoose';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { validateEmail, validatePhone } from '../validations/validation';
 
-const userSchema = new mongoose.Schema(
+export interface IUser extends Document {
+  role: 'renter' | 'landlord' | 'technician' | 'admin';
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  address: {
+    street: string;
+    ward: string;
+    district: string;
+    city: string;
+  };
+  dob?: Date;
+  gender: 'male' | 'female' | 'other';
+  preferredUtilities?: string[];
+  preferredPriceRange?: {
+    min: number;
+    max: number;
+  };
+  avatar: string;
+  rating: number;
+  isBanned: boolean;
+  isVerified: boolean;
+  verificationDocument?: Array<{
+    type: 'idCard' | 'passport' | 'driverLicense';
+    number: string;
+    image: string;
+    verifyAt: Date;
+    status: 'pending' | 'approved' | 'rejected';
+  }>;
+  lastLogin?: Date;
+  loginHistory?: Array<{
+    ip: string;
+    device: string;
+    timestamp: Date;
+  }>;
+  notificationSettings: {
+    email: boolean;
+  };
+  comparePassword(enteredPassword: string): Promise<boolean>;
+  generateAuthToken(): string;
+  hasRole(role: string): boolean;
+}
+
+const userSchema = new Schema<IUser>(
   {
     role: {
       type: String,
@@ -48,7 +92,7 @@ const userSchema = new mongoose.Schema(
       required: [true, 'Password is required'],
       minlength: [8, 'Password must be at least 8 characters long'],
       validate: {
-        validator: function (v) {
+        validator: function (v: string) {
           return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])[A-Za-z\d!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]{8,}$/.test(
             v
           );
@@ -91,7 +135,7 @@ const userSchema = new mongoose.Schema(
     preferredUtilities: {
       type: [String],
       validate: {
-        validator: function (v) {
+        validator: function (v: string[]) {
           const validUtilities = [
             'wifi',
             'aircon',
@@ -110,8 +154,8 @@ const userSchema = new mongoose.Schema(
         type: Number,
         min: [0, 'Minimum price cannot be negative'],
         validate: {
-          validator: function (v) {
-            return v <= this.max;
+          validator: function (v: number) {
+            return v <= (this as any).max;
           },
           message: 'Minimum price must be less than maximum price',
         },
@@ -176,22 +220,22 @@ const userSchema = new mongoose.Schema(
 );
 
 // Compare password method
-userSchema.methods.comparePassword = async function (enteredPassword) {
+userSchema.methods.comparePassword = async function (enteredPassword: string): Promise<boolean> {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
 // Generate JWT token
-userSchema.methods.generateAuthToken = function () {
-  return jwt.sign({ userId: this._id, role: this.role }, process.env.JWT_SECRET, {
+userSchema.methods.generateAuthToken = function (): string {
+  return jwt.sign({ userId: this._id, role: this.role }, process.env.JWT_SECRET as string, {
     expiresIn: '30d',
   });
 };
 
 // Check if user has required role
-userSchema.methods.hasRole = function (role) {
+userSchema.methods.hasRole = function (role: string): boolean {
   return this.role === role;
 };
 
-const User = mongoose.model('User', userSchema);
+const User: Model<IUser> = model<IUser>('User', userSchema);
 
-module.exports = User;
+export default User;

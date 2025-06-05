@@ -2,12 +2,14 @@
   "name": "stayhub-backend",
   "version": "1.0.0",
   "description": "Backend API for StayHub - Room Rental Platform",
-  "main": "src/app.js",
+  "main": "dist/app.js",
   "scripts": {
-    "start": "nodemon src/app.js",
-    "dev": "nodemon src/app.js",
-    "lint": "eslint .",
-    "format": "prettier --write ."
+    "start": "node dist/app.js",
+    "dev": "nodemon",
+    "build": "tsc",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -25,9 +27,20 @@
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/http-errors": "^2.0.4",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.11.24",
+    "@types/nodemailer": "^6.4.14",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
     "eslint": "^8.38.0",
     "nodemon": "^2.0.22",
-    "prettier": "^2.8.7"
+    "prettier": "^2.8.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=14.0.0"

@@ -1,18 +1,73 @@
 /**
  * @fileoverview Authentication Service - Handles user authentication and authorization
  * @created 2025-05-29
- * @file auth.service.js
+ * @file auth.service.ts
  * @description This service provides methods for user registration, login, profile management,
  * and email verification. It handles password hashing, JWT token generation, and user data validation.
  */
 
-const User = require('../models/user.model');
-const TokenBlacklist = require('../models/token-blacklist.model');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const { validateEmail, validatePhone } = require('../validations/validation');
-const EmailService = require('./email.service');
-const logger = require('../utils/logger');
+import { Document } from 'mongoose';
+import User from '../models/user.model';
+import TokenBlacklist from '../models/token-blacklist.model';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { validateEmail, validatePhone } from '../validations/validation';
+import EmailService from './email.service';
+import logger from '../utils/logger';
+
+interface Address {
+  street: string;
+  ward: string;
+  district: string;
+  city: string;
+}
+
+interface UserData {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  address: Address;
+}
+
+interface UpdateData {
+  dob?: Date;
+  gender?: string;
+  preferredUtilities?: string[];
+  preferredPriceRange?: {
+    min: number;
+    max: number;
+  };
+  avatar?: string;
+  verificationDocument?: string;
+}
+
+interface UserResponse {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  address: Address;
+  gender: string;
+  avatar: string;
+  isVerified: boolean;
+  isBanned: boolean;
+  rating: number;
+  dob?: Date;
+  preferredUtilities?: string[];
+  preferredPriceRange?: {
+    min: number;
+    max: number;
+  };
+  verificationDocument?: string;
+}
+
+interface AuthResponse {
+  user: UserResponse;
+  token: string;
+  refreshToken: string;
+}
 
 /**
  * @class AuthService
@@ -22,20 +77,11 @@ class AuthService {
   /**
    * @route POST /api/auth/register
    * @description Register a new user
-   * @param {Object} userData - User registration data
-   * @param {string} userData.name - User's full name
-   * @param {string} userData.email - User's email address
-   * @param {string} userData.phone - User's phone number
-   * @param {string} userData.password - User's password
-   * @param {Object} userData.address - User's address information
-   * @param {string} userData.address.street - Street address
-   * @param {string} userData.address.ward - Ward/Commune
-   * @param {string} userData.address.district - District
-   * @param {string} userData.address.city - City
-   * @returns {Object} User data with tokens
+   * @param {UserData} userData - User registration data
+   * @returns {Promise<AuthResponse>} User data with tokens
    * @throws {Error} If required fields are missing or invalid
    */
-  static async register(userData) {
+  static async register(userData: UserData): Promise<AuthResponse> {
     try {
       logger.info('Starting registration process:', { email: userData.email });
 
@@ -107,9 +153,13 @@ class AuthService {
       const refreshToken = this.generateRefreshToken(newUser._id);
 
       logger.info('Registration successful');
-      const verificationToken = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
-        expiresIn: '1h',
-      });
+      const verificationToken = jwt.sign(
+        { userId: newUser._id },
+        process.env.JWT_SECRET as string,
+        {
+          expiresIn: '1h',
+        }
+      );
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const verificationLink = `${frontendUrl}/api/auth/verify-email/${verificationToken}`;
 
@@ -124,11 +174,12 @@ class AuthService {
         refreshToken,
       };
     } catch (error) {
+      const err = error as Error;
       logger.error('Registration error:', {
-        error: error.message,
-        stack: error.stack,
-        code: error.code,
-        name: error.name,
+        error: err.message,
+        stack: err.stack,
+        code: (err as any).code,
+        name: err.name,
       });
       throw error;
     }
@@ -138,17 +189,11 @@ class AuthService {
    * @route PUT /api/auth/profile
    * @description Update user profile
    * @param {string} userId - User ID
-   * @param {Object} updateData - Update data
-   * @param {Date} [updateData.dob] - Date of birth
-   * @param {string} [updateData.gender] - Gender
-   * @param {string[]} [updateData.preferredUtilities] - Preferred utilities
-   * @param {Object} [updateData.preferredPriceRange] - Preferred price range
-   * @param {string} [updateData.avatar] - Avatar URL
-   * @param {string} [updateData.verificationDocument] - Verification document URL
-   * @returns {Object} Updated user data
+   * @param {UpdateData} updateData - Update data
+   * @returns {Promise<UserResponse>} Updated user data
    * @throws {Error} If user not found or validation fails
    */
-  static async updateProfile(userId, updateData) {
+  static async updateProfile(userId: string, updateData: UpdateData): Promise<UserResponse> {
     try {
       const user = await User.findById(userId);
       if (!user) {
@@ -166,17 +211,18 @@ class AuthService {
 
       Object.keys(updateData).forEach((key) => {
         if (allowedUpdates.includes(key)) {
-          user[key] = updateData[key];
+          (user as any)[key] = updateData[key as keyof UpdateData];
         }
       });
 
       await user.save();
       return this.formatUserResponse(user);
     } catch (error) {
+      const err = error as Error;
       logger.error('Profile update error:', {
         userId,
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
@@ -188,8 +234,11 @@ class AuthService {
    * @param {string} userId - User ID
    * @returns {string} JWT token
    */
-  static generateToken(userId) {
-    return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
+  static generateToken(userId: string): string {
+    const options: SignOptions = {
+      expiresIn: (process.env.JWT_EXPIRES_IN || '1d') as jwt.SignOptions['expiresIn'],
+    };
+    return jwt.sign({ userId }, process.env.JWT_SECRET as string, options);
   }
 
   /**
@@ -198,45 +247,47 @@ class AuthService {
    * @param {string} userId - User ID
    * @returns {string} Refresh token
    */
-  static generateRefreshToken(userId) {
-    return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
-      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
-    });
+  static generateRefreshToken(userId: string): string {
+    const options: SignOptions = {
+      expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'],
+    };
+    return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET as string, options);
   }
 
   /**
-   * @route GET /api/auth/me
    * @description Format user response
-   * @param {Object} user - User data
-   * @returns {Object} Formatted user data
+   * @param {Document} user - User document
+   * @returns {UserResponse} Formatted user data
    */
-  static formatUserResponse(user) {
-    const userWithoutPassword = user.toObject();
-    delete userWithoutPassword.password;
-    return userWithoutPassword;
+  static formatUserResponse(user: Document): UserResponse {
+    const userObj = user.toObject();
+    delete userObj.password;
+    return userObj as UserResponse;
   }
 
   /**
    * @route POST /api/auth/login
-   * @description Authenticate user
+   * @description Login user
    * @param {string} email - User email
    * @param {string} password - User password
-   * @returns {Object} Login result
+   * @returns {Promise<AuthResponse>} User data with tokens
+   * @throws {Error} If credentials are invalid
    */
-  static async login(email, password) {
+  static async login(email: string, password: string): Promise<AuthResponse> {
     try {
       const user = await User.findOne({ email }).select('+password');
       if (!user) {
-        throw new Error('Invalid credentials');
+        throw { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password', status: 401 };
       }
 
-      if (user.isBanned) {
-        throw new Error('Account has been banned');
+      if (!user.password) {
+        logger.error('User found but password is undefined:', { email });
+        throw { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password', status: 401 };
       }
 
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        throw new Error('Invalid credentials');
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        throw { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password', status: 401 };
       }
 
       const token = this.generateToken(user._id);
@@ -248,33 +299,36 @@ class AuthService {
         refreshToken,
       };
     } catch (error) {
+      const err = error as Error;
       logger.error('Login error:', {
         email,
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
   }
 
   /**
-   * @route GET /api/auth/me
+   * @route GET /api/auth/profile
    * @description Get user profile
    * @param {string} userId - User ID
-   * @returns {Object} User profile data
+   * @returns {Promise<UserResponse>} User profile data
+   * @throws {Error} If user not found
    */
-  static async getUserProfile(userId) {
+  static async getUserProfile(userId: string): Promise<UserResponse> {
     try {
-      const user = await User.findById(userId).select('-password');
+      const user = await User.findById(userId);
       if (!user) {
         throw new Error('User not found');
       }
       return this.formatUserResponse(user);
     } catch (error) {
+      const err = error as Error;
       logger.error('Get profile error:', {
         userId,
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
@@ -284,22 +338,25 @@ class AuthService {
    * @route POST /api/auth/verify-email
    * @description Verify user email
    * @param {string} token - Verification token
-   * @returns {Object} Verification result
+   * @returns {Promise<boolean>} Success status
+   * @throws {Error} If token is invalid or expired
    */
-  static async verifyEmail(token) {
+  static async verifyEmail(token: string): Promise<boolean> {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
       const user = await User.findById(decoded.userId);
       if (!user) {
         throw new Error('User not found');
       }
+
       user.isVerified = true;
       await user.save();
-      return this.formatUserResponse(user);
+      return true;
     } catch (error) {
+      const err = error as Error;
       logger.error('Email verification error:', {
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
@@ -310,64 +367,50 @@ class AuthService {
    * @description Logout user
    * @param {string} userId - User ID
    * @param {string} token - JWT token
-   * @returns {Object} Logout result
+   * @returns {Promise<boolean>} Success status
    */
-  static async logout(userId, token) {
+  static async logout(userId: string, token: string): Promise<boolean> {
     try {
-      const user = await User.findById(userId);
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      // Decode token to get expiration
-      const decoded = jwt.decode(token);
-      if (!decoded || !decoded.exp) {
-        throw new Error('Invalid token');
-      }
-
-      // Add token to blacklist
-      await TokenBlacklist.create({
-        token,
-        expiresAt: new Date(decoded.exp * 1000), // Convert to milliseconds
-      });
-
-      return { success: true };
+      await this.revokeToken(token);
+      return true;
     } catch (error) {
+      const err = error as Error;
       logger.error('Logout error:', {
         userId,
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
   }
 
   /**
-   * @route POST /api/auth/verify-token
-   * @description Verify if token is blacklisted
-   * @param {string} token - JWT token to verify
-   * @returns {boolean} True if token is valid
+   * @description Check if token is blacklisted
+   * @param {string} token - JWT token
+   * @returns {Promise<boolean>} True if token is blacklisted
    */
-  static async isTokenBlacklisted(token) {
+  static async isTokenBlacklisted(token: string): Promise<boolean> {
     try {
       const blacklistedToken = await TokenBlacklist.findOne({ token });
       return !!blacklistedToken;
     } catch (error) {
+      const err = error as Error;
       logger.error('Token blacklist check error:', {
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
   }
 
   /**
-   * @route POST /api/auth/send-verification-email
+   * @route POST /api/auth/send-verification
    * @description Send verification email
    * @param {string} email - User email
-   * @returns {Object} Verification email result
+   * @returns {Promise<boolean>} Success status
+   * @throws {Error} If user not found or already verified
    */
-  static async sendVerificationEmail(email) {
+  static async sendVerificationEmail(email: string): Promise<boolean> {
     try {
       const user = await User.findOne({ email });
       if (!user) {
@@ -375,49 +418,10 @@ class AuthService {
       }
 
       if (user.isVerified) {
-        throw new Error('User already verified');
+        throw new Error('Email already verified');
       }
 
-      const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-        expiresIn: '1h',
-      });
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const verificationLink = `${frontendUrl}/api/auth/verify-email/${verificationToken}`;
-
-      await EmailService.sendTemplatedEmail(email, 'REGISTRATION', {
-        name: user.name,
-        verificationLink,
-      });
-
-      return { success: true };
-    } catch (error) {
-      logger.error('Send verification email error:', {
-        email,
-        error: error.message,
-        stack: error.stack,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * @route POST /api/auth/resend-verification-email
-   * @description Resend verification email
-   * @param {string} email - User email
-   * @returns {Object} Verification email result
-   */
-  static async resendVerificationEmail(email) {
-    try {
-      const user = await User.findOne({ email });
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      if (user.isVerified) {
-        throw new Error('User already verified');
-      }
-
-      const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET as string, {
         expiresIn: '1h',
       });
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -428,12 +432,43 @@ class AuthService {
         verificationLink,
       });
 
-      return { success: true };
+      return true;
     } catch (error) {
+      const err = error as Error;
+      logger.error('Send verification email error:', {
+        email,
+        error: err.message,
+        stack: err.stack,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * @route POST /api/auth/resend-verification
+   * @description Resend verification email
+   * @param {string} email - User email
+   * @returns {Promise<boolean>} Success status
+   * @throws {Error} If user not found or already verified
+   */
+  static async resendVerificationEmail(email: string): Promise<boolean> {
+    try {
+      const user = await User.findOne({ email });
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (user.isVerified) {
+        throw new Error('Email already verified');
+      }
+
+      return this.sendVerificationEmail(email);
+    } catch (error) {
+      const err = error as Error;
       logger.error('Resend verification email error:', {
         email,
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
@@ -441,11 +476,13 @@ class AuthService {
 
   /**
    * @route POST /api/auth/change-password
-   * @description Change password
+   * @description Change user password
    * @param {string} email - User email
-   * @returns {Object} Change password result
+   * @param {string} newPassword - New password
+   * @returns {Promise<boolean>} Success status
+   * @throws {Error} If user not found or validation fails
    */
-  static async changePassword(email, newPassword) {
+  static async changePassword(email: string, newPassword: string): Promise<boolean> {
     try {
       const user = await User.findOne({ email });
       if (!user) {
@@ -454,15 +491,17 @@ class AuthService {
 
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(newPassword, salt);
+
       user.password = hashedPassword;
       await user.save();
 
-      return { success: true };
+      return true;
     } catch (error) {
+      const err = error as Error;
       logger.error('Change password error:', {
         email,
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
@@ -472,32 +511,34 @@ class AuthService {
    * @route POST /api/auth/forgot-password
    * @description Send password reset email
    * @param {string} email - User email
-   * @returns {Object} Password reset email result
+   * @returns {Promise<boolean>} Success status
+   * @throws {Error} If user not found
    */
-  static async forgotPassword(email) {
+  static async forgotPassword(email: string): Promise<boolean> {
     try {
       const user = await User.findOne({ email });
       if (!user) {
         throw new Error('User not found');
       }
 
-      const resetToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      const resetToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET as string, {
         expiresIn: '1h',
       });
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const resetLink = `${frontendUrl}/reset-password/${resetToken}`;
+      const resetLink = `${frontendUrl}/api/auth/reset-password/${resetToken}`;
 
       await EmailService.sendTemplatedEmail(email, 'PASSWORD_RESET', {
         name: user.name,
         resetLink,
       });
 
-      return { success: true };
+      return true;
     } catch (error) {
+      const err = error as Error;
       logger.error('Forgot password error:', {
         email,
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
       throw error;
     }
@@ -505,98 +546,89 @@ class AuthService {
 
   /**
    * @route POST /api/auth/reset-password
-   * @description Reset password using token
-   * @param {string} token - Reset token from email
+   * @description Reset user password
+   * @param {string} token - Reset token
    * @param {string} newPassword - New password
-   * @returns {Object} Reset password result
+   * @returns {Promise<boolean>} Success status
+   * @throws {Error} If token is invalid or expired
    */
-  static async resetPassword(token, newPassword) {
+  static async resetPassword(token: string, newPassword: string): Promise<boolean> {
     try {
-      if (!token || !newPassword) {
-        throw new Error('Token and new password are required');
-      }
-
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
       const user = await User.findById(decoded.userId);
-
       if (!user) {
         throw new Error('User not found');
       }
 
-      // Validate password strength
-      if (newPassword.length < 8) {
-        throw new Error('Password must be at least 8 characters long');
-      }
-
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(newPassword, salt);
+
       user.password = hashedPassword;
       await user.save();
 
-      return { success: true, message: 'Password reset successfully' };
+      return true;
     } catch (error) {
+      const err = error as Error;
       logger.error('Reset password error:', {
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
-      if (error.name === 'JsonWebTokenError') {
-        throw new Error('Invalid or expired reset token');
-      }
       throw error;
     }
   }
 
   /**
-   * Refresh token
+   * @route POST /api/auth/refresh-token
+   * @description Refresh JWT token
    * @param {string} refreshToken - Refresh token
-   * @returns {Object} New access token
+   * @returns {Promise<{ token: string; refreshToken: string }>} New tokens
+   * @throws {Error} If refresh token is invalid or expired
    */
-  static async refreshToken(refreshToken) {
+  static async refreshToken(
+    refreshToken: string
+  ): Promise<{ token: string; refreshToken: string }> {
     try {
-      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string) as {
+        userId: string;
+      };
       const user = await User.findById(decoded.userId);
       if (!user) {
         throw new Error('User not found');
       }
 
-      const newAccessToken = this.generateToken(user._id);
-      return { token: newAccessToken };
+      const token = this.generateToken(user._id);
+      const newRefreshToken = this.generateRefreshToken(user._id);
+
+      return { token, refreshToken: newRefreshToken };
     } catch (error) {
+      const err = error as Error;
       logger.error('Refresh token error:', {
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
-      throw new Error('Failed to refresh token: ' + error.message);
+      throw error;
     }
   }
 
   /**
-   * Revoke token
-   * @param {string} token - Token to revoke
-   * @returns {Object} Revocation result
+   * @description Revoke JWT token
+   * @param {string} token - JWT token
+   * @returns {Promise<boolean>} Success status
    */
-  static async revokeToken(token) {
+  static async revokeToken(token: string): Promise<boolean> {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-      const user = await User.findById(decoded.userId);
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      await TokenBlacklist.create({
-        token,
-        expiresAt: new Date(decoded.exp * 1000),
-      });
-
-      return { success: true };
+      const blacklistedToken = new TokenBlacklist({ token });
+      await blacklistedToken.save();
+      return true;
     } catch (error) {
+      const err = error as Error;
       logger.error('Revoke token error:', {
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
-      throw new Error('Failed to revoke token: ' + error.message);
+      throw error;
     }
   }
 }
 
-module.exports = AuthService;
+export default AuthService;

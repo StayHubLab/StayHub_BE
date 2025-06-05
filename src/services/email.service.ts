@@ -1,15 +1,15 @@
 /**
  * @fileoverview Email Service - Handles email sending functionality
  * @created 2025-05-31
- * @file email.service.js
+ * @file email.service.ts
  * @description This file defines the email service for the application.
  */
 
-const nodemailer = require('nodemailer');
-const { OAuth2Client } = require('google-auth-library');
-const { emailConfig } = require('../config/email.config');
-const emailTemplates = require('../templates/email.templates');
-const logger = require('../utils/logger');
+import nodemailer from 'nodemailer';
+import { OAuth2Client } from 'google-auth-library';
+import { emailConfig } from '../config/email.config';
+import emailTemplates from '../templates/email.templates';
+import logger from '../utils/logger';
 
 // Initialize OAuth2Client with Client ID and Client Secret
 const myOAuth2Client = new OAuth2Client(
@@ -22,18 +22,25 @@ myOAuth2Client.setCredentials({
   refresh_token: emailConfig.googleMailerRefreshToken,
 });
 
+interface TemplateData {
+  [key: string]: any;
+}
+
 /**
  * Service for sending emails using OAuth2 and Nodemailer
  */
 class EmailService {
   /**
    * Send an email using a template
-   * @param {string} to - Recipient's email address
-   * @param {string} templateType - Type of email template to use
-   * @param {Object} templateData - Data to be used in the template
-   * @returns {Promise<void>}
+   * @param to - Recipient's email address
+   * @param templateType - Type of email template to use
+   * @param templateData - Data to be used in the template
    */
-  static async sendTemplatedEmail(to, templateType, templateData = {}) {
+  static async sendTemplatedEmail(
+    to: string,
+    templateType: string,
+    templateData: TemplateData = {}
+  ): Promise<void> {
     try {
       if (!to) {
         throw new Error('Recipient email address is required');
@@ -56,12 +63,11 @@ class EmailService {
 
   /**
    * Send a custom email
-   * @param {string} to - Recipient's email address
-   * @param {string} subject - Email subject
-   * @param {string} content - Email content
-   * @returns {Promise<void>}
+   * @param to - Recipient's email address
+   * @param subject - Email subject
+   * @param content - Email content
    */
-  static async sendEmail(to, subject, content) {
+  static async sendEmail(to: string, subject: string, content: string): Promise<void> {
     try {
       if (!to || !subject || !content) {
         throw new Error('Missing required email parameters');
@@ -82,7 +88,7 @@ class EmailService {
           refresh_token: emailConfig.googleMailerRefreshToken,
           accessToken: myAccessToken,
         },
-      });
+      } as any);
 
       // Configure email
       const mailOptions = {
@@ -102,4 +108,4 @@ class EmailService {
   }
 }
 
-module.exports = EmailService;
+export default EmailService;

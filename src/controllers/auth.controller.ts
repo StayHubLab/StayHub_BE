@@ -1,28 +1,52 @@
 /**
  * @fileoverview Authentication Controller - Handles HTTP requests for user authentication
  * @created 2025-05-29
- * @file auth.controller.js
+ * @file auth.controller.ts
  * @description This controller manages user authentication endpoints including registration,
  * login, logout, profile management, and email verification. It handles request validation,
  * error responses, and coordinates with the AuthService for business logic.
  */
 
-const AuthService = require('../services/auth.service');
-const logger = require('../utils/logger');
-const { validateEmail, validatePhone, validatePassword } = require('../validations/validation');
+import { Request, Response } from 'express';
+import AuthService from '../services/auth.service';
+import logger from '../utils/logger';
+import { validateEmail, validatePhone } from '../validations/validation';
 
-const formatResponse = (res, { success = true, message, data = null, status = 200 }) => {
+interface ResponseData {
+  success?: boolean;
+  message: string;
+  data?: any;
+  status?: number;
+}
+
+interface ErrorResponse {
+  code: string;
+  message: string;
+  stack?: string;
+}
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    _id: string;
+    [key: string]: any;
+  };
+}
+
+const formatResponse = (
+  res: Response,
+  { success = true, message, data = null, status = 200 }: ResponseData
+): Response => {
   return res.status(status).json({ success, message, ...(data && { data }) });
 };
 
-const handleError = (error, res, context) => {
+const handleError = (error: ErrorResponse, res: Response, context: string): Response => {
   logger.error(`${context} error:`, {
     error: error.message,
     stack: error.stack,
     code: error.code,
   });
 
-  const errorMap = {
+  const errorMap: Record<string, { status: number; message: string; error?: string }> = {
     MISSING_FIELDS: { status: 400, message: error.message },
     INVALID_EMAIL: { status: 400, message: error.message },
     INVALID_PASSWORD: { status: 400, message: error.message },
@@ -32,7 +56,7 @@ const handleError = (error, res, context) => {
     EMAIL_NOT_FOUND: { status: 404, message: error.message },
     TOKEN_EXPIRED: { status: 401, message: error.message },
     UNAUTHORIZED: { status: 401, message: error.message },
-    INVALID_CREDENTIALS: { status: 401, message: error.message },
+    INVALID_CREDENTIALS: { status: 401, message: 'Invalid email or password' },
     USER_NOT_FOUND: { status: 404, message: error.message },
     USER_EXISTS: { status: 409, message: error.message },
     EMAIL_VERIFIED: { status: 400, message: error.message },
@@ -54,7 +78,7 @@ const handleError = (error, res, context) => {
   });
 };
 
-const validateToken = (req) => {
+const validateToken = (req: Request): string => {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.split(' ')[1];
@@ -68,7 +92,7 @@ const validateToken = (req) => {
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  sameSite: 'lax' as const,
   path: '/',
   domain: process.env.COOKIE_DOMAIN || 'localhost',
 };
@@ -82,7 +106,7 @@ const cookieOptions = {
  * @param {string} req.body.password - User password
  * @returns {Object} Registration result
  */
-exports.register = async (req, res) => {
+export const register = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email, password, phone, name, address } = req.body;
 
@@ -102,7 +126,13 @@ exports.register = async (req, res) => {
     }
 
     // Validate password strength
-    if (!validatePassword(password)) {
+    if (
+      password.length < 8 ||
+      !/[A-Z]/.test(password) ||
+      !/[a-z]/.test(password) ||
+      !/[0-9]/.test(password) ||
+      !/[!@#$%^&*]/.test(password)
+    ) {
       throw {
         code: 'INVALID_PASSWORD',
         message:
@@ -117,7 +147,7 @@ exports.register = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    handleError(error, res, 'Registration');
+    return handleError(error as ErrorResponse, res, 'Registration');
   }
 };
 
@@ -130,43 +160,65 @@ exports.register = async (req, res) => {
  * @param {string} req.body.password - User password
  * @returns {Object} Login result with tokens
  */
-exports.login = async (req, res) => {
+export const login = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email, password } = req.body;
 
+    logger.info('Login attempt:', { email });
+
     // Validate required fields
     if (!email || !password) {
+      logger.warn('Login failed: Missing fields', { email });
       throw { code: 'MISSING_FIELDS', message: 'Email and password are required' };
     }
 
     // Validate email format
     if (!validateEmail(email)) {
+      logger.warn('Login failed: Invalid email format', { email });
       throw { code: 'INVALID_EMAIL', message: 'Invalid email format' };
     }
 
-    const result = await AuthService.login(email, password);
+    try {
+      const result = await AuthService.login(email, password);
 
-    // Set secure cookies
-    res.cookie('token', result.token, {
-      ...cookieOptions,
-      maxAge: 15 * 60 * 1000, // 15 minutes
-    });
-    res.cookie('refreshToken', result.refreshToken, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+      // Set secure cookies
+      res.cookie('token', result.token, {
+        ...cookieOptions,
+        maxAge: 15 * 60 * 1000, // 15 minutes
+      });
+      res.cookie('refreshToken', result.refreshToken, {
+        ...cookieOptions,
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
 
-    return formatResponse(res, {
-      message: 'Login successful',
-      data: {
-        user: result.user,
-        token: result.token,
-        refreshToken: result.refreshToken,
-        expiresIn: 15 * 60,
-      },
+      logger.info('Login successful:', { email });
+      return formatResponse(res, {
+        message: 'Login successful',
+        data: {
+          user: result.user,
+          token: result.token,
+          refreshToken: result.refreshToken,
+          expiresIn: 15 * 60,
+        },
+      });
+    } catch (error: any) {
+      // Ensure the error has the correct structure
+      if (!error.code) {
+        error = {
+          code: 'INVALID_CREDENTIALS',
+          message: 'Invalid email or password',
+          status: 401,
+        };
+      }
+      throw error;
+    }
+  } catch (error: any) {
+    logger.error('Login error:', {
+      error: error.message,
+      code: error.code,
+      stack: error.stack,
     });
-  } catch (error) {
-    handleError(error, res, 'Login');
+    return handleError(error as ErrorResponse, res, 'Login');
   }
 };
 
@@ -177,7 +229,7 @@ exports.login = async (req, res) => {
  * @param {Object} req.user - Authenticated user object
  * @returns {Object} Logout result
  */
-exports.logout = async (req, res) => {
+export const logout = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
   try {
     if (!req.user?._id) {
       throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
@@ -192,7 +244,7 @@ exports.logout = async (req, res) => {
 
     return formatResponse(res, { message: 'Logged out successfully' });
   } catch (error) {
-    handleError(error, res, 'Logout');
+    return handleError(error as ErrorResponse, res, 'Logout');
   }
 };
 
@@ -203,7 +255,7 @@ exports.logout = async (req, res) => {
  * @param {Object} req.user - Authenticated user object
  * @returns {Object} User profile data
  */
-exports.getProfile = async (req, res) => {
+export const getProfile = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
   try {
     if (!req.user?._id) {
       throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
@@ -213,7 +265,7 @@ exports.getProfile = async (req, res) => {
     const user = await AuthService.getUserProfile(req.user._id);
     return formatResponse(res, { message: 'Profile retrieved successfully', data: user });
   } catch (error) {
-    handleError(error, res, 'Get profile');
+    return handleError(error as ErrorResponse, res, 'Get profile');
   }
 };
 
@@ -225,7 +277,10 @@ exports.getProfile = async (req, res) => {
  * @param {Object} req.body - Profile update data
  * @returns {Object} Updated user profile
  */
-exports.updateProfile = async (req, res) => {
+export const updateProfile = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<Response> => {
   try {
     if (!req.user?._id) {
       throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
@@ -241,7 +296,7 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await AuthService.updateProfile(req.user._id, req.body);
     return formatResponse(res, { message: 'Profile updated successfully', data: updatedUser });
   } catch (error) {
-    handleError(error, res, 'Update profile');
+    return handleError(error as ErrorResponse, res, 'Update profile');
   }
 };
 
@@ -252,7 +307,7 @@ exports.updateProfile = async (req, res) => {
  * @param {string} req.params.token - Email verification token
  * @returns {Object} Verification result
  */
-exports.verifyEmail = async (req, res) => {
+export const verifyEmail = async (req: Request, res: Response): Promise<Response> => {
   try {
     if (!req.params.token) {
       throw { code: 'INVALID_TOKEN', message: 'Verification token is required' };
@@ -261,7 +316,7 @@ exports.verifyEmail = async (req, res) => {
     const result = await AuthService.verifyEmail(req.params.token);
     return formatResponse(res, { message: 'Email verified successfully', data: result });
   } catch (error) {
-    handleError(error, res, 'Email verification');
+    return handleError(error as ErrorResponse, res, 'Email verification');
   }
 };
 
@@ -273,7 +328,7 @@ exports.verifyEmail = async (req, res) => {
  * @param {string} req.body.email - User email
  * @returns {Object} Email sending result
  */
-exports.sendVerificationEmail = async (req, res) => {
+export const sendVerificationEmail = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email } = req.body;
 
@@ -288,7 +343,7 @@ exports.sendVerificationEmail = async (req, res) => {
     const result = await AuthService.sendVerificationEmail(email);
     return formatResponse(res, { message: 'Verification email sent successfully', data: result });
   } catch (error) {
-    handleError(error, res, 'Send verification email');
+    return handleError(error as ErrorResponse, res, 'Send verification email');
   }
 };
 
@@ -300,7 +355,7 @@ exports.sendVerificationEmail = async (req, res) => {
  * @param {string} req.body.email - User email
  * @returns {Object} Email sending result
  */
-exports.resendVerificationEmail = async (req, res) => {
+export const resendVerificationEmail = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email } = req.body;
 
@@ -315,7 +370,7 @@ exports.resendVerificationEmail = async (req, res) => {
     const result = await AuthService.resendVerificationEmail(email);
     return formatResponse(res, { message: 'Verification email sent successfully', data: result });
   } catch (error) {
-    handleError(error, res, 'Resend verification email');
+    return handleError(error as ErrorResponse, res, 'Resend verification email');
   }
 };
 
@@ -329,7 +384,10 @@ exports.resendVerificationEmail = async (req, res) => {
  * @param {string} req.body.newPassword - New password
  * @returns {Object} Password change result
  */
-exports.changePassword = async (req, res) => {
+export const changePassword = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<Response> => {
   try {
     if (!req.user?._id) {
       throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
@@ -341,7 +399,13 @@ exports.changePassword = async (req, res) => {
       throw { code: 'MISSING_FIELDS', message: 'Old password and new password are required' };
     }
 
-    if (!validatePassword(newPassword)) {
+    if (
+      newPassword.length < 8 ||
+      !/[A-Z]/.test(newPassword) ||
+      !/[a-z]/.test(newPassword) ||
+      !/[0-9]/.test(newPassword) ||
+      !/[!@#$%^&*]/.test(newPassword)
+    ) {
       throw {
         code: 'INVALID_PASSWORD',
         message:
@@ -350,7 +414,7 @@ exports.changePassword = async (req, res) => {
     }
 
     validateToken(req);
-    const result = await AuthService.changePassword(req.user._id, oldPassword, newPassword);
+    const result = await AuthService.changePassword(req.user._id, oldPassword);
 
     // Clear cookies after password change
     res.clearCookie('token', cookieOptions);
@@ -358,7 +422,7 @@ exports.changePassword = async (req, res) => {
 
     return formatResponse(res, { message: 'Password changed successfully', data: result });
   } catch (error) {
-    handleError(error, res, 'Change password');
+    return handleError(error as ErrorResponse, res, 'Change password');
   }
 };
 
@@ -370,7 +434,7 @@ exports.changePassword = async (req, res) => {
  * @param {string} req.body.email - User email
  * @returns {Object} Password reset request result
  */
-exports.forgotPassword = async (req, res) => {
+export const forgotPassword = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email } = req.body;
 
@@ -385,7 +449,7 @@ exports.forgotPassword = async (req, res) => {
     const result = await AuthService.forgotPassword(email);
     return formatResponse(res, { message: 'Password reset email sent successfully', data: result });
   } catch (error) {
-    handleError(error, res, 'Forgot password');
+    return handleError(error as ErrorResponse, res, 'Forgot password');
   }
 };
 
@@ -398,7 +462,7 @@ exports.forgotPassword = async (req, res) => {
  * @param {string} req.body.newPassword - New password
  * @returns {Object} Password reset result
  */
-exports.resetPassword = async (req, res) => {
+export const resetPassword = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { token, newPassword } = req.body;
 
@@ -406,7 +470,13 @@ exports.resetPassword = async (req, res) => {
       throw { code: 'MISSING_FIELDS', message: 'Token and new password are required' };
     }
 
-    if (!validatePassword(newPassword)) {
+    if (
+      newPassword.length < 8 ||
+      !/[A-Z]/.test(newPassword) ||
+      !/[a-z]/.test(newPassword) ||
+      !/[0-9]/.test(newPassword) ||
+      !/[!@#$%^&*]/.test(newPassword)
+    ) {
       throw {
         code: 'INVALID_PASSWORD',
         message:
@@ -422,7 +492,7 @@ exports.resetPassword = async (req, res) => {
 
     return formatResponse(res, { message: 'Password reset successfully', data: result });
   } catch (error) {
-    handleError(error, res, 'Reset password');
+    return handleError(error as ErrorResponse, res, 'Reset password');
   }
 };
 
@@ -434,7 +504,7 @@ exports.resetPassword = async (req, res) => {
  * @param {string} req.body.refreshToken - Refresh token
  * @returns {Object} New access token
  */
-exports.refreshToken = async (req, res) => {
+export const refreshToken = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { refreshToken } = req.body;
 
@@ -462,7 +532,7 @@ exports.refreshToken = async (req, res) => {
       },
     });
   } catch (error) {
-    handleError(error, res, 'Refresh token');
+    return handleError(error as ErrorResponse, res, 'Refresh token');
   }
 };
 
@@ -474,7 +544,7 @@ exports.refreshToken = async (req, res) => {
  * @param {string} req.body.token - Token to revoke
  * @returns {Object} Revoke token result
  */
-exports.revokeToken = async (req, res) => {
+export const revokeToken = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
   try {
     if (!req.user?._id) {
       throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
@@ -489,6 +559,6 @@ exports.revokeToken = async (req, res) => {
 
     return formatResponse(res, { message: 'Token revoked successfully', data: result });
   } catch (error) {
-    handleError(error, res, 'Revoke token');
+    return handleError(error as ErrorResponse, res, 'Revoke token');
   }
 };

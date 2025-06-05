@@ -1,13 +1,74 @@
 /**
  * @fileoverview Building Model - Defines the building schema and methods
  * @created 2025-05-29
- * @file building.model.js
+ * @file building.model.ts
  * @description This file defines the building schema and methods.
  */
 
-const mongoose = require('mongoose');
+import mongoose, { Document, Model } from 'mongoose';
 
-const buildingSchema = new mongoose.Schema(
+interface IAddress {
+  street: string;
+  ward: string;
+  district: string;
+  city: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
+
+interface IImage {
+  url: string;
+  type: 'exterior' | 'interior' | 'room' | 'amenity';
+  isVerified: boolean;
+  uploadedAt: Date;
+}
+
+interface INearbyPlace {
+  name: string;
+  type: string;
+  distance: number;
+}
+
+interface IPremiumFeatures {
+  isPremium: boolean;
+  premiumUntil?: Date;
+  featuredUntil?: Date;
+}
+
+interface IBuilding extends Document {
+  hostId: mongoose.Types.ObjectId;
+  name: string;
+  address: IAddress;
+  description?: string;
+  floors?: number;
+  area: number;
+  avgPrice: number;
+  highlightPoints: string[];
+  rulesFile?: string;
+  mapLink?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  rating: number;
+  totalRooms: number;
+  availableRooms: number;
+  amenities: string[];
+  images: IImage[];
+  nearbyPlaces: INearbyPlace[];
+  premiumFeatures: IPremiumFeatures;
+  status: 'active' | 'inactive' | 'pending';
+  occupancyRate: number;
+  isPremium: boolean;
+  updateAvailability(rooms: number): Promise<IBuilding>;
+}
+
+interface IBuildingModel extends Model<IBuilding> {
+  findByCity(city: string): Promise<IBuilding[]>;
+  findPremium(): Promise<IBuilding[]>;
+}
+
+const buildingSchema = new mongoose.Schema<IBuilding>(
   {
     hostId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -138,17 +199,21 @@ buildingSchema.index({ rating: -1 });
 buildingSchema.index({ 'premiumFeatures.isPremium': 1 });
 
 // Virtual fields
-buildingSchema.virtual('occupancyRate').get(function () {
+buildingSchema.virtual('occupancyRate').get(function (this: IBuilding) {
   if (!this.totalRooms) return 0;
   return ((this.totalRooms - this.availableRooms) / this.totalRooms) * 100;
 });
 
-buildingSchema.virtual('isPremium').get(function () {
-  return this.premiumFeatures.isPremium && this.premiumFeatures.premiumUntil > new Date();
+buildingSchema.virtual('isPremium').get(function (this: IBuilding) {
+  return (
+    this.premiumFeatures.isPremium &&
+    this.premiumFeatures.premiumUntil &&
+    this.premiumFeatures.premiumUntil > new Date()
+  );
 });
 
 // Pre-save middleware
-buildingSchema.pre('save', function (next) {
+buildingSchema.pre('save', function (this: IBuilding, next) {
   if (this.availableRooms > this.totalRooms) {
     next(new Error('Available rooms cannot be greater than total rooms'));
   }
@@ -156,7 +221,7 @@ buildingSchema.pre('save', function (next) {
 });
 
 // Static methods
-buildingSchema.statics.findByCity = function (city) {
+buildingSchema.statics.findByCity = function (city: string) {
   return this.find({ 'address.city': city });
 };
 
@@ -168,7 +233,7 @@ buildingSchema.statics.findPremium = function () {
 };
 
 // Instance methods
-buildingSchema.methods.updateAvailability = function (rooms) {
+buildingSchema.methods.updateAvailability = function (this: IBuilding, rooms: number) {
   if (this.availableRooms + rooms < 0) {
     throw new Error('Not enough available rooms');
   }
@@ -176,6 +241,6 @@ buildingSchema.methods.updateAvailability = function (rooms) {
   return this.save();
 };
 
-const Building = mongoose.model('Building', buildingSchema);
+const Building = mongoose.model<IBuilding, IBuildingModel>('Building', buildingSchema);
 
-module.exports = Building;
+export default Building;

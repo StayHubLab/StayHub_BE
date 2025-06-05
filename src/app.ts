@@ -1,33 +1,34 @@
 /**
  * @fileoverview Main Application File - Initializes the Express application and sets up middleware
  * @created 2025-05-29
- * @file app.js
+ * @file app.ts
  * @description This file is the entry point for the application. It sets up the Express application,
  * connects to the database, and starts the server.
  */
 
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const connectDB = require('./config/database');
-const logger = require('./utils/logger');
-const { errorHandler } = require('./middlewares/error.middleware');
+import 'dotenv/config';
+import express, { Express, Request, Response } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { Server } from 'http';
+import connectDB from './config/database';
+import logger from './utils/logger';
+import { errorHandler } from './middlewares/error.middleware';
 
 // Import routes
-const authRoutes = require('./routes/auth.routes');
-const userRoutes = require('./routes/user.routes');
-const emailRoutes = require('./routes/email.routes');
-const landlordRoutes = require('./routes/landlord.routes');
-const renterRoutes = require('./routes/renter.routes');
-const adminRoutes = require('./routes/admin.routes');
-const buildingRoutes = require('./routes/building.routes');
+import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
+import emailRoutes from './routes/email.routes';
+import landlordRoutes from './routes/landlord.routes';
+import renterRoutes from './routes/renter.routes';
+import adminRoutes from './routes/admin.routes';
+import buildingRoutes from './routes/building.routes';
 
 // Import middleware
-const { auth } = require('./middlewares/auth.middleware');
+import { auth } from './middlewares/auth.middleware';
 
-const app = express();
+const app: Express = express();
 
 // Security middleware
 app.use(
@@ -67,11 +68,18 @@ app.use(
   })
 );
 
+// Extend Express Request interface to include rawBody
+declare module 'express' {
+  interface Request {
+    rawBody?: Buffer;
+  }
+}
+
 // Body parsing middleware with optimized settings
 app.use(
   express.json({
     limit: '10mb',
-    verify: (req, res, buf) => {
+    verify: (req: Request, res: Response, buf: Buffer) => {
       req.rawBody = buf;
     },
   })
@@ -85,7 +93,7 @@ app.use(
 );
 
 // Health check endpoint with detailed status
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -107,7 +115,7 @@ app.use('/api/buildings', buildingRoutes);
 app.use(errorHandler);
 
 // Start server function with improved error handling
-const startServer = async () => {
+const startServer = async (): Promise<void> => {
   try {
     console.log('Starting server initialization...');
     console.log('Environment variables check:', {
@@ -120,7 +128,7 @@ const startServer = async () => {
     await connectDB();
     const PORT = process.env.PORT || 3000;
 
-    const server = app.listen(PORT, () => {
+    const server: Server = app.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`);
     });
 
@@ -133,18 +141,19 @@ const startServer = async () => {
       });
     });
 
-    server.on('error', (error) => {
+    server.on('error', (error: Error) => {
       logger.error('Server failed to start:', {
         error: error.message,
         stack: error.stack,
-        code: error.code,
+        code: (error as NodeJS.ErrnoException).code,
       });
       process.exit(1);
     });
   } catch (error) {
+    const err = error as Error;
     logger.error('Application startup failed:', {
-      error: error.message,
-      stack: error.stack,
+      error: err.message,
+      stack: err.stack,
       env: {
         nodeEnv: process.env.NODE_ENV,
         port: process.env.PORT,
@@ -158,4 +167,4 @@ const startServer = async () => {
 // Start the application
 startServer();
 
-module.exports = app;
+export default app;

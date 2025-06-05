@@ -6,10 +6,10 @@
  * It includes routes for user registration, login, logout, profile management, and email verification.
  */
 
-const express = require('express');
+import express from 'express';
+import * as authController from '../controllers/auth.controller';
+import { auth } from '../middlewares/auth.middleware';
 const router = express.Router();
-const authController = require('../controllers/auth.controller');
-const { auth } = require('../middlewares/auth.middleware');
 
 // Public routes
 router.post('/register', authController.register);
@@ -28,4 +28,4 @@ router.put('/profile', auth, authController.updateProfile);
 router.post('/change-password', auth, authController.changePassword);
 router.post('/revoke-token', auth, authController.revokeToken);
 
-module.exports = router;
+export default router;
