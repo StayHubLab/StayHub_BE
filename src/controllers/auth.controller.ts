@@ -28,7 +28,8 @@ interface ErrorResponse {
 interface AuthenticatedRequest extends Request {
   user?: {
     _id: string;
-    [key: string]: any;
+    role: 'renter' | 'landlord' | 'technician' | 'admin';
+    email: string;
   };
 }
 

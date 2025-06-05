@@ -11,13 +11,15 @@ import AuthService from '../services/auth.service';
 
 interface JwtPayload {
   userId: string;
-  role: string;
+  role: 'renter' | 'landlord' | 'technician' | 'admin';
+  email: string;
 }
 
 interface AuthenticatedRequest extends Request {
   user?: {
     _id: string;
-    role: string;
+    role: 'renter' | 'landlord' | 'technician' | 'admin';
+    email: string;
   };
 }
 
@@ -42,7 +44,8 @@ const auth = async (
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
     req.user = {
       _id: decoded.userId,
-      role: decoded.role,
+      role: decoded.role as 'renter' | 'landlord' | 'technician' | 'admin',
+      email: decoded.email,
     };
     next();
   } catch (error) {
