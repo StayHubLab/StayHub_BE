@@ -84,6 +84,15 @@ app.use(
   })
 );
 
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.url}`, {
+    query: req.query,
+    params: req.params,
+    body: req.body,
+  });
+  next();
+});
+
 // Health check endpoint with detailed status
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -94,14 +103,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes
+// API Routes - Order matters!
+app.use('/api/buildings', buildingRoutes); // Move buildings route first
 app.use('/api/auth', authRoutes);
 app.use('/api/users', auth, userRoutes);
 app.use('/api/email', auth, emailRoutes);
 app.use('/api/landlord', auth, landlordRoutes);
 app.use('/api/renter', auth, renterRoutes);
 app.use('/api/admin', auth, adminRoutes);
-app.use('/api/buildings', buildingRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
@@ -109,8 +118,8 @@ app.use(errorHandler);
 // Start server function with improved error handling
 const startServer = async () => {
   try {
-    console.log('Starting server initialization...');
-    console.log('Environment variables check:', {
+    logger.info('Starting server initialization...');
+    logger.info('Environment variables check:', {
       NODE_ENV: process.env.NODE_ENV,
       PORT: process.env.PORT,
       MONGODB_URI: process.env.MONGODB_URI ? 'URI is set' : 'URI is not set',

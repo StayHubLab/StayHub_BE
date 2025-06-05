@@ -11,19 +11,19 @@ const router = express.Router();
 const {
   getAllBuildings,
   getBuildingById,
-  // createBuilding,
-  // updateBuilding,
-  // deleteBuilding,
+  createBuilding,
+  updateBuilding,
+  deleteBuilding,
 } = require('../controllers/building.controller');
-// const { auth } = require('../middlewares/auth.middleware');
+const { auth } = require('../middlewares/auth.middleware');
 
 // Public routes
 router.get('/', getAllBuildings);
 router.get('/:id', getBuildingById);
 
 // Protected routes
-// router.post('/', auth, createBuilding);
-// router.put('/:id', auth, updateBuilding);
-// router.delete('/:id', auth, deleteBuilding);
+router.post('/', auth, createBuilding);
+router.put('/:id', auth, updateBuilding);
+router.delete('/:id', auth, deleteBuilding);
 
 module.exports = router;

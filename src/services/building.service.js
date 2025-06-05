@@ -8,6 +8,7 @@
 const Building = require('../models/building.model');
 const logger = require('../utils/logger');
 const { NotFoundError, ValidationError } = require('../utils/errors');
+const mongoose = require('mongoose');
 
 /**
  * @class BuildingService
@@ -57,19 +58,38 @@ class BuildingService {
    */
   static async getBuildingById(buildingId) {
     try {
+      logger.info('BuildingService: Getting building by ID', { buildingId });
+
       if (!buildingId) {
+        logger.error('BuildingService: Building ID is missing');
         throw new ValidationError('Building ID is required');
       }
 
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(buildingId)) {
+        logger.error('BuildingService: Invalid building ID format', { buildingId });
+        throw new ValidationError('Invalid building ID format');
+      }
+
       const building = await Building.findById(buildingId).lean();
+      logger.info('BuildingService: Building query result', {
+        buildingId,
+        found: !!building,
+        status: building?.status,
+      });
 
       if (!building) {
+        logger.error('BuildingService: Building not found', { buildingId });
         throw new NotFoundError(`Building with id ${buildingId} not found`);
       }
 
       return building;
     } catch (error) {
-      logger.error('Error getting building by id:', error);
+      logger.error('BuildingService: Error getting building by id:', {
+        error: error.message,
+        stack: error.stack,
+        buildingId,
+      });
       throw error;
     }
   }
