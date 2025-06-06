@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Landlord Routes - Handles landlord operations
+ * @created 2025-06-06
+ * @file landlord.routes.js
+ * @description This file defines the routes for landlord operations.
+ */
+
 const express = require('express');
 const router = express.Router();
 const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
