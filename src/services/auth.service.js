@@ -211,9 +211,16 @@ class AuthService {
    * @returns {Object} Formatted user data
    */
   static formatUserResponse(user) {
-    const userWithoutPassword = user.toObject();
-    delete userWithoutPassword.password;
-    return userWithoutPassword;
+    if (!user) return null;
+
+    // If it's a Mongoose document, convert to plain object
+    const userObj = user.toObject ? user.toObject() : user;
+
+    // Remove sensitive fields
+    delete userObj.password;
+    delete userObj.refreshToken;
+
+    return userObj;
   }
 
   /**
