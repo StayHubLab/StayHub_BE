@@ -103,7 +103,7 @@ class AuthService {
       await newUser.save();
 
       logger.info('Generating tokens');
-      const token = this.generateToken(newUser._id);
+      const token = await this.generateToken(newUser._id);
       const refreshToken = this.generateRefreshToken(newUser._id);
 
       logger.info('Registration successful');
@@ -188,8 +188,14 @@ class AuthService {
    * @param {string} userId - User ID
    * @returns {string} JWT token
    */
-  static generateToken(userId) {
-    return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
+  static async generateToken(userId) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    return jwt.sign({ userId, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN,
+    });
   }
 
   /**
@@ -246,7 +252,7 @@ class AuthService {
         throw new Error('Invalid credentials');
       }
 
-      const token = this.generateToken(user._id);
+      const token = await this.generateToken(user._id);
       const refreshToken = this.generateRefreshToken(user._id);
 
       return {
@@ -566,7 +572,7 @@ class AuthService {
         throw new Error('User not found');
       }
 
-      const newAccessToken = this.generateToken(user._id);
+      const newAccessToken = await this.generateToken(user._id);
       return { token: newAccessToken };
     } catch (error) {
       logger.error('Refresh token error:', {

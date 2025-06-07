@@ -15,15 +15,15 @@ const {
   updateBuilding,
   deleteBuilding,
 } = require('../controllers/building.controller');
-const { auth } = require('../middlewares/auth.middleware');
+const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 
 // Public routes
 router.get('/', getAllBuildings);
 router.get('/:id', getBuildingById);
 
 // Protected routes
-router.post('/', auth, createBuilding);
-router.put('/:id', auth, updateBuilding);
-router.delete('/:id', auth, deleteBuilding);
+router.post('/', auth, roleMiddleware('landlord', 'admin'), createBuilding);
+router.put('/:id', auth, roleMiddleware('landlord', 'admin'), updateBuilding);
+router.delete('/:id', auth, roleMiddleware('landlord', 'admin'), deleteBuilding);
 
 module.exports = router;

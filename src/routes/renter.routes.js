@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Renter Routes - Handles renter operations
+ * @created 2025-06-06
+ * @file renter.routes.js
+ * @description This file defines the routes for renter operations.
+ */
+
 const express = require('express');
 const router = express.Router();
 const { auth, roleMiddleware } = require('../middlewares/auth.middleware');

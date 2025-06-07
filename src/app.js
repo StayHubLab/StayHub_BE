@@ -23,6 +23,7 @@ const landlordRoutes = require('./routes/landlord.routes');
 const renterRoutes = require('./routes/renter.routes');
 const adminRoutes = require('./routes/admin.routes');
 const buildingRoutes = require('./routes/building.routes');
+const roomRoutes = require('./routes/room.routes');
 
 // Import middleware
 const { auth } = require('./middlewares/auth.middleware');
@@ -104,7 +105,8 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes - Order matters!
-app.use('/api/buildings', buildingRoutes); // Move buildings route first
+app.use('/api/buildings', buildingRoutes);
+app.use('/api/rooms', roomRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', auth, userRoutes);
 app.use('/api/email', auth, emailRoutes);
