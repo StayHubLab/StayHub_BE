@@ -149,3 +149,90 @@ exports.deleteRoom = async (req, res) => {
     });
   }
 };
+
+/**
+ * @route GET /api/rooms/search
+ * @description Search rooms by keyword
+ * @param {string} keyword - Search keyword
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @returns {Object} Search results with pagination
+ */
+exports.searchRooms = async (req, res) => {
+  try {
+    // Get parameters from both query and body
+    const keyword = req.query.keyword || req.body.keyword;
+    const page = parseInt(req.query.page || req.body.page || 1);
+    const limit = parseInt(req.query.limit || req.body.limit || 10);
+
+    logger.info('Searching rooms:', { keyword, page, limit });
+
+    if (!keyword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search keyword is required',
+      });
+    }
+
+    const searchResults = await RoomService.searchRooms(keyword, { page, limit });
+    res.status(200).json({
+      success: true,
+      message: 'Rooms search completed',
+      data: searchResults,
+    });
+    logger.info('Room search completed successfully');
+  } catch (error) {
+    logger.error('Error searching rooms:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error searching rooms',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @route GET /api/rooms/filter
+ * @description Filter rooms by criteria
+ * @param {Object} filters - Filter criteria
+ * @param {number} filters.minPrice - Minimum price
+ * @param {number} filters.maxPrice - Maximum price
+ * @param {number} filters.minArea - Minimum area
+ * @param {number} filters.maxArea - Maximum area
+ * @param {string[]} filters.amenities - Required amenities
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @returns {Object} Filtered rooms with pagination
+ */
+exports.filterRooms = async (req, res) => {
+  try {
+    // Get parameters from both query and body
+    const filters = {
+      minPrice: req.query.minPrice || req.body.minPrice,
+      maxPrice: req.query.maxPrice || req.body.maxPrice,
+      minArea: req.query.minArea || req.body.minArea,
+      maxArea: req.query.maxArea || req.body.maxArea,
+      amenities: (req.query.amenities || req.body.amenities)?.split(','),
+    };
+
+    const page = parseInt(req.query.page || req.body.page || 1);
+    const limit = parseInt(req.query.limit || req.body.limit || 10);
+
+    logger.info('Filtering rooms:', { filters, page, limit });
+
+    const filteredRooms = await RoomService.filterRooms(filters, { page, limit });
+    res.status(200).json({
+      success: true,
+      message: 'Rooms filtered successfully',
+      data: filteredRooms,
+    });
+    logger.info('Room filtering completed successfully');
+  } catch (error) {
+    logger.error('Error filtering rooms:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error filtering rooms',
+      error: error.message,
+    });
+  }
+};

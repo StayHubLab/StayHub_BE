@@ -13,11 +13,15 @@ const {
   createRoom,
   updateRoom,
   deleteRoom,
+  searchRooms,
+  filterRooms,
 } = require('../controllers/room.controller');
 const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 
 //Public Routes
 router.get('/', getAllRooms);
+router.get('/search', searchRooms);
+router.get('/filter', filterRooms);
 router.get('/:id', getRoomById);
 
 //Protected Routes

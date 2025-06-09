@@ -7,6 +7,8 @@
 
 const BuildingService = require('../services/building.service');
 const logger = require('../utils/logger');
+const mongoose = require('mongoose');
+const Room = require('../models/room.model');
 
 /**
  * @route GET /api/buildings
@@ -164,6 +166,52 @@ exports.deleteBuilding = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting building',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @route GET /api/buildings/:id/rooms
+ * @description Get all rooms of a building
+ * @param {string} id - Building ID
+ * @returns {Object} Rooms data
+ */
+exports.getRoomsByBuildingId = async (req, res) => {
+  try {
+    const buildingId = req.params.id;
+    logger.info('Getting rooms by building ID:', { buildingId });
+
+    if (!buildingId) {
+      logger.error('Building ID is missing');
+      return res.status(400).json({
+        success: false,
+        message: 'Building ID is required',
+      });
+    }
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(buildingId)) {
+      logger.error('Invalid building ID format', { buildingId });
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid building ID format',
+      });
+    }
+
+    const rooms = await Room.find({ buildingId }).lean();
+    logger.info('Rooms found:', { buildingId, count: rooms.length });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Rooms retrieved successfully',
+      data: rooms,
+    });
+  } catch (error) {
+    logger.error('Error getting rooms by building ID:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error getting rooms by building ID',
       error: error.message,
     });
   }

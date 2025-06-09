@@ -14,12 +14,14 @@ const {
   createBuilding,
   updateBuilding,
   deleteBuilding,
+  getRoomsByBuildingId,
 } = require('../controllers/building.controller');
 const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 
 // Public routes
 router.get('/', getAllBuildings);
 router.get('/:id', getBuildingById);
+router.get('/:id/rooms', getRoomsByBuildingId);
 
 // Protected routes
 router.post('/', auth, roleMiddleware('landlord', 'admin'), createBuilding);

@@ -44,27 +44,50 @@ const validateRoomConsistency = function (next) {
 
 /**
  * Pre-update middleware to ensure room data consistency
+ * @param {Object} filter - The filter object
  * @param {Object} update - The update object
+ * @param {Object} options - The options object
  * @param {Function} next - Next middleware function
  */
-const validateRoomUpdate = function (update, next) {
-  if (update.$set && update.$set.status === 'rented' && !update.$set.currentTenant) {
-    next(new Error('Cannot set room status to rented without a tenant'));
-    return;
-  }
+const validateRoomUpdate = function (filter, update, options, next) {
+  try {
+    // If no update object, just proceed
+    if (!update) {
+      return next();
+    }
 
-  // Validate price updates
-  if (update.$set && update.$set.price) {
-    const priceFields = ['rent', 'electricity', 'water', 'service', 'deposit'];
-    for (const field of priceFields) {
-      if (update.$set.price[field] < 0) {
-        next(new Error(`${field} price cannot be negative`));
-        return;
+    // Handle both $set and direct updates
+    const updateData = update.$set || update;
+
+    // Check status update
+    if (updateData.status === 'rented' && !updateData.currentTenant) {
+      return next(new Error('Cannot set room status to rented without a tenant'));
+    }
+
+    // Validate price updates
+    if (updateData.price) {
+      const priceFields = ['rent', 'electricity', 'water', 'service', 'deposit'];
+      for (const field of priceFields) {
+        if (updateData.price[field] !== undefined && updateData.price[field] < 0) {
+          return next(new Error(`${field} price cannot be negative`));
+        }
       }
     }
-  }
 
-  next();
+    // Validate area update
+    if (updateData.area !== undefined && updateData.area < 0) {
+      return next(new Error('Area cannot be negative'));
+    }
+
+    // Validate capacity update
+    if (updateData.capacity !== undefined && updateData.capacity < 1) {
+      return next(new Error('Capacity must be at least 1'));
+    }
+
+    return next();
+  } catch (error) {
+    return next(error);
+  }
 };
 
 module.exports = {
