@@ -164,8 +164,15 @@ roomSchema.statics.findAvailable = function () {
 
 // Apply middleware
 roomSchema.pre('save', validateRoomConsistency);
-roomSchema.pre('findOneAndUpdate', validateRoomUpdate);
-roomSchema.pre('updateOne', validateRoomUpdate);
+
+// Register update middleware
+roomSchema.pre('findOneAndUpdate', function (next) {
+  validateRoomUpdate(this.getQuery(), this.getUpdate(), this.getOptions(), next);
+});
+
+roomSchema.pre('updateOne', function (next) {
+  validateRoomUpdate(this.getQuery(), this.getUpdate(), this.getOptions(), next);
+});
 
 const Room = mongoose.model('Room', roomSchema);
 

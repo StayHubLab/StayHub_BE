@@ -161,14 +161,14 @@ class RoomService {
         throw new ValidationError('Update data is required');
       }
 
-      //Validate ObjectId format
-      if (!mongoose.Types.ObjectId.isValid(updateData.buildingId)) {
-        logger.error('RoomService: Invalid building ID format', { updateData });
-        throw new ValidationError('Invalid building ID format');
+      //Update room
+      const updatedRoom = await Room.findByIdAndUpdate(roomId, updateData, { new: true });
+
+      if (!updatedRoom) {
+        logger.error('RoomService: Room not found', { roomId });
+        throw new NotFoundError(`Room with id ${roomId} not found`);
       }
 
-      //Update room
-      const updatedRoom = await Room.findByIdAndUpdate(roomId, updateData, { new: true }).lean();
       logger.info('RoomService: Room updated successfully', { roomId, updatedRoom });
 
       return updatedRoom.toObject();
@@ -262,6 +262,97 @@ class RoomService {
         error: error.message,
         stack: error.stack,
       });
+      throw error;
+    }
+  }
+
+  /**
+   * Search rooms by keyword
+   * @param {string} keyword - Search keyword
+   * @param {Object} options - Pagination options
+   * @returns {Promise<Object>} Search results with pagination
+   */
+  static async searchRooms(keyword, { page = 1, limit = 10 } = {}) {
+    try {
+      const skip = (page - 1) * limit;
+
+      // Create search query
+      const searchQuery = {
+        $or: [
+          { name: { $regex: keyword, $options: 'i' } },
+          { 'utilities.name': { $regex: keyword, $options: 'i' } },
+          { status: { $regex: keyword, $options: 'i' } },
+        ],
+      };
+
+      const [rooms, total] = await Promise.all([
+        Room.find(searchQuery).skip(skip).limit(limit).lean(),
+        Room.countDocuments(searchQuery),
+      ]);
+
+      return {
+        rooms,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      logger.error('Error searching rooms:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Filter rooms by criteria
+   * @param {Object} filters - Filter criteria
+   * @param {Object} options - Pagination options
+   * @returns {Promise<Object>} Filtered rooms with pagination
+   */
+  static async filterRooms(filters, { page = 1, limit = 10 } = {}) {
+    try {
+      const skip = (page - 1) * limit;
+
+      // Build filter query
+      const query = {};
+
+      // Price filter
+      if (filters.minPrice || filters.maxPrice) {
+        query['price.rent'] = {};
+        if (filters.minPrice) query['price.rent'].$gte = filters.minPrice;
+        if (filters.maxPrice) query['price.rent'].$lte = filters.maxPrice;
+      }
+
+      // Area filter
+      if (filters.minArea || filters.maxArea) {
+        query.area = {};
+        if (filters.minArea) query.area.$gte = filters.minArea;
+        if (filters.maxArea) query.area.$lte = filters.maxArea;
+      }
+
+      // Amenities filter
+      if (filters.amenities && filters.amenities.length > 0) {
+        query['utilities.name'] = { $all: filters.amenities };
+      }
+
+      const [rooms, total] = await Promise.all([
+        Room.find(query).skip(skip).limit(limit).lean(),
+        Room.countDocuments(query),
+      ]);
+
+      return {
+        rooms,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      logger.error('Error filtering rooms:', error);
       throw error;
     }
   }
