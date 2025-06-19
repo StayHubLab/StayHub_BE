@@ -24,6 +24,7 @@ const renterRoutes = require('./routes/renter.routes');
 const adminRoutes = require('./routes/admin.routes');
 const buildingRoutes = require('./routes/building.routes');
 const roomRoutes = require('./routes/room.routes');
+const bookingRoutes = require('./routes/booking.routes');
 
 // Import middleware
 const { auth } = require('./middlewares/auth.middleware');
@@ -113,6 +114,7 @@ app.use('/api/email', auth, emailRoutes);
 app.use('/api/landlord', auth, landlordRoutes);
 app.use('/api/renter', auth, renterRoutes);
 app.use('/api/admin', auth, adminRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
