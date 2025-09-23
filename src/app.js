@@ -25,6 +25,8 @@ const adminRoutes = require('./routes/admin.routes');
 const buildingRoutes = require('./routes/building.routes');
 const roomRoutes = require('./routes/room.routes');
 const bookingRoutes = require('./routes/booking.routes');
+const contractRoutes = require('./routes/contract.routes');
+const billRoutes = require('./routes/bill.routes');
 
 // Import middleware
 const { auth } = require('./middlewares/auth.middleware');
@@ -115,6 +117,8 @@ app.use('/api/landlord', auth, landlordRoutes);
 app.use('/api/renter', auth, renterRoutes);
 app.use('/api/admin', auth, adminRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/bills', billRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
@@ -131,7 +135,7 @@ const startServer = async () => {
     });
 
     await connectDB();
-    const PORT = process.env.PORT || 3000;
+    const PORT = process.env.PORT || 5000;
 
     const server = app.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`);

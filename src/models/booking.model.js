@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Booking Model - Defines the booking schema and methods
+ * @created 2025-05-09
+ * @file booking.model.js
+ * @description This file defines the booking schema and methods.
+ */
+
 const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema(

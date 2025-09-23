@@ -84,11 +84,18 @@ const cookieOptions = {
  */
 exports.register = async (req, res) => {
   try {
-    const { email, password, phone, name, address } = req.body;
+    const { email, password, phone, name, address, verificationCode } = req.body;
+    // Get role from either request body or query parameter (for frontend flow)
+    const role = req.body.role || req.query.role;
 
     // Validate required fields
-    if (!email || !password || !phone || !name || !address) {
-      throw { code: 'MISSING_FIELDS', message: 'All fields are required' };
+    if (!email || !password || !phone || !name || !address || !role || !verificationCode) {
+      throw { code: 'MISSING_FIELDS', message: 'All fields are required including role' };
+    }
+
+    // Validate role
+    if (!['landlord', 'tenant'].includes(role)) {
+      throw { code: 'INVALID_ROLE', message: 'Role must be either landlord or tenant' };
     }
 
     // Validate email format
@@ -266,9 +273,36 @@ exports.verifyEmail = async (req, res) => {
 };
 
 /**
+ * @route POST /api/auth/send-verification-code
+ * @category Authentication & Security
+ * @description Send verification code to email before registration
+ * @param {Object} req.body - Email data
+ * @param {string} req.body.email - User email
+ * @returns {Object} Code sending result
+ */
+exports.sendVerificationCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw { code: 'MISSING_FIELDS', message: 'Email is required' };
+    }
+
+    if (!validateEmail(email)) {
+      throw { code: 'INVALID_EMAIL', message: 'Invalid email format' };
+    }
+
+    const result = await AuthService.sendVerificationCode(email);
+    return formatResponse(res, { message: 'Verification code sent successfully', data: result });
+  } catch (error) {
+    handleError(error, res, 'Send verification code');
+  }
+};
+
+/**
  * @route POST /api/auth/send-verification
  * @category Authentication & Security
- * @description Send verification email
+ * @description Send verification email (legacy endpoint)
  * @param {Object} req.body - Email data
  * @param {string} req.body.email - User email
  * @returns {Object} Email sending result
