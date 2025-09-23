@@ -110,6 +110,33 @@ const emailTemplates = {
   },
 
   /**
+   * Verification code email template
+   */
+  VERIFICATION_CODE: {
+    subject: 'Xác nhận đăng ký - StayHub',
+    getContent: ({ code, email }) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #2c3e50; margin: 0;">Mã xác nhận đăng ký StayHub</h1>
+        </div>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+          <p style="color: #34495e; margin: 0;">Xin chào!</p>
+          <p style="color: #34495e; margin: 15px 0 0 0;">Cảm ơn bạn đã đăng ký tài khoản StayHub với email: <strong>${email}</strong></p>
+          <p style="color: #34495e; margin: 15px 0 0 0;">Để hoàn tất đăng ký, vui lòng nhập mã xác nhận sau vào form đăng ký:</p>
+        </div>
+        <div style="text-align: center; margin: 30px 0;">
+          <div style="background-color: #3498db; color: white; padding: 20px; border-radius: 8px; font-size: 32px; font-weight: bold; letter-spacing: 5px; display: inline-block;">${code}</div>
+        </div>
+        <div style="text-align: center; color: #7f8c8d; font-size: 14px;">
+          <p style="margin: 0;">Mã này sẽ hết hạn sau 10 phút.</p>
+          <p style="margin: 10px 0 0 0;">Nếu bạn không yêu cầu đăng ký này, vui lòng bỏ qua email này.</p>
+          <p style="margin: 10px 0 0 0;">Trân trọng,<br>Đội ngũ StayHub</p>
+        </div>
+      </div>
+    `,
+  },
+
+  /**
    * Password reset email template
    */
   PASSWORD_RESET: {

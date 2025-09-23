@@ -12,6 +12,7 @@ const authController = require('../controllers/auth.controller');
 const { auth } = require('../middlewares/auth.middleware');
 
 // Public routes
+router.post('/send-verification-code', authController.sendVerificationCode);
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.get('/verify-email/:token', authController.verifyEmail);

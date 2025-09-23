@@ -8,6 +8,7 @@
 
 const User = require('../models/user.model');
 const TokenBlacklist = require('../models/token-blacklist.model');
+const VerificationCode = require('../models/verification-code.model');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { validateEmail, validatePhone } = require('../validations/validation');
@@ -39,16 +40,20 @@ class AuthService {
     try {
       logger.info('Starting registration process:', { email: userData.email });
 
-      const { name, email, phone, password, address } = userData;
+      const { name, email, phone, password, address, role, verificationCode } = userData;
 
-      if (!name || !email || !phone || !password) {
+      if (!name || !email || !phone || !password || !role || !verificationCode) {
         logger.error('Missing required fields:', {
           name: !!name,
           email: !!email,
           phone: !!phone,
           password: !!password,
+          role: !!role,
+          verificationCode: !!verificationCode,
         });
-        throw new Error('Missing required fields: name, email, phone, password');
+        throw new Error(
+          'Missing required fields: name, email, phone, password, role, verificationCode'
+        );
       }
 
       if (!address || !address.street || !address.ward || !address.district || !address.city) {
@@ -59,6 +64,17 @@ class AuthService {
           city: !!address?.city,
         });
         throw new Error('Missing required address fields: street, ward, district, city');
+      }
+
+      // Validate role
+      if (!['landlord', 'tenant'].includes(role)) {
+        throw new Error('Invalid role. Must be landlord or tenant');
+      }
+
+      // Verify verification code
+      const isValidCode = await this.verifyCode(email, verificationCode);
+      if (!isValidCode) {
+        throw new Error('Invalid or expired verification code');
       }
 
       logger.info('Validating email and phone');
@@ -90,11 +106,11 @@ class AuthService {
         phone,
         password: hashedPassword,
         address,
-        role: 'renter',
+        role: role === 'tenant' ? 'renter' : role, // Map tenant to renter in DB
         // Set default values for optional fields
         gender: 'other',
         avatar: 'https://example.com/default-avatar.png',
-        isVerified: false,
+        isVerified: true, // Set to true since verification code was verified
         isBanned: false,
         rating: 0,
       });
@@ -107,16 +123,6 @@ class AuthService {
       const refreshToken = this.generateRefreshToken(newUser._id);
 
       logger.info('Registration successful');
-      const verificationToken = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
-        expiresIn: '1h',
-      });
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const verificationLink = `${frontendUrl}/api/auth/verify-email/${verificationToken}`;
-
-      await EmailService.sendTemplatedEmail(email, 'REGISTRATION', {
-        name: newUser.name,
-        verificationLink,
-      });
 
       return {
         user: this.formatUserResponse(newUser),
@@ -608,6 +614,92 @@ class AuthService {
         stack: error.stack,
       });
       throw new Error('Failed to revoke token: ' + error.message);
+    }
+  }
+
+  /**
+   * Send verification code to email before registration
+   * @param {string} email - User email
+   * @returns {Object} Code sending result
+   */
+  static async sendVerificationCode(email) {
+    try {
+      logger.info('Sending verification code:', { email });
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        throw new Error('User already exists');
+      }
+
+      // Generate 6-digit verification code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Delete any existing codes for this email
+      await VerificationCode.deleteMany({ email });
+
+      // Create new verification code
+      const verificationCode = new VerificationCode({
+        email,
+        code,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      });
+
+      await verificationCode.save();
+
+      // Send email with verification code
+      await EmailService.sendTemplatedEmail(email, 'VERIFICATION_CODE', {
+        code,
+        email,
+      });
+
+      logger.info('Verification code sent successfully:', { email });
+      return { success: true };
+    } catch (error) {
+      logger.error('Send verification code error:', {
+        email,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Verify verification code
+   * @param {string} email - User email
+   * @param {string} code - Verification code
+   * @returns {boolean} True if code is valid
+   */
+  static async verifyCode(email, code) {
+    try {
+      logger.info('Verifying code:', { email });
+
+      const verificationCode = await VerificationCode.findOne({
+        email,
+        code,
+        isUsed: false,
+        expiresAt: { $gt: new Date() },
+      });
+
+      if (!verificationCode) {
+        logger.error('Invalid or expired verification code:', { email });
+        return false;
+      }
+
+      // Mark code as used
+      verificationCode.isUsed = true;
+      await verificationCode.save();
+
+      logger.info('Verification code verified successfully:', { email });
+      return true;
+    } catch (error) {
+      logger.error('Verify code error:', {
+        email,
+        error: error.message,
+        stack: error.stack,
+      });
+      return false;
     }
   }
 }
