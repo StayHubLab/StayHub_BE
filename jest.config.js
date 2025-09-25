@@ -4,9 +4,6 @@ module.exports = {
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
-  coveragePathIgnorePatterns: [
-    '/node_modules/',
-    '/tests/'
-  ],
-  setupFiles: ['dotenv/config']
-}; 
+  coveragePathIgnorePatterns: ['/node_modules/', '/tests/'],
+  setupFiles: ['dotenv/config'],
+};

@@ -162,6 +162,479 @@ const emailTemplates = {
       </div>
     `,
   },
+
+  /**
+   * Viewing appointment confirmation email template (Polished)
+   */
+  VIEWING_CONFIRMATION: {
+    subject: 'Xác nhận đặt lịch xem phòng trọ - StayHub',
+    getContent: (data) => {
+      const {
+        customerName,
+        roomName,
+        roomPrice,
+        buildingName,
+        buildingAddress,
+        viewingDate,
+        viewingTime,
+        landlordName,
+        landlordPhone,
+        notes,
+      } = data;
+
+      const formatPrice = (price) => {
+        try {
+          // Handle case where price is already a number
+          const numPrice =
+            typeof price === 'number'
+              ? price
+              : typeof price === 'string'
+              ? parseFloat(price)
+              : typeof price === 'object' && price !== null
+              ? parseFloat(price.toString())
+              : 0;
+
+          if (isNaN(numPrice)) return 'Liên hệ';
+
+          return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND',
+          }).format(numPrice);
+        } catch {
+          return typeof price === 'number'
+            ? `${price?.toLocaleString?.('vi-VN') || price} ₫`
+            : 'Liên hệ';
+        }
+      };
+
+      const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('vi-VN', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      };
+
+      const SITE = process.env.FRONTEND_URL || 'https://stayhub.com';
+      const LOGO =
+        'https://cdn-img.upanhlaylink.com/img/image_202506094d11076c38a6a6044e43c4b7acd4d0ad.jpg';
+
+      return `
+  <!-- Preheader (hidden in most clients, improves inbox preview) -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    Lịch xem phòng của bạn đã được xác nhận. Xem chi tiết thời gian, địa chỉ và liên hệ chủ nhà trong email này.
+  </div>
+
+  <div style="background-color:#f3f5f9; padding:24px;">
+    <div style="font-family: -apple-system, Segoe UI, Roboto, Arial, 'Noto Sans', Helvetica, sans-serif; max-width:680px; margin:0 auto;">
+
+      <!-- Card wrapper -->
+      <div style="background-color:#ffffff; border:1px solid #e6ebf1; border-radius:14px; overflow:hidden; box-shadow:0 6px 20px rgba(16,24,40,.06);">
+
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); padding:32px 28px; text-align:center; position:relative;">
+          <a href="${SITE}" style="text-decoration:none; display:inline-block;">
+            <img src="${LOGO}" width="72" height="72" alt="StayHub" style="border-radius:14px; display:block; margin:0 auto 14px auto; outline:none; border:none;">
+          </a>
+          <h1 style="margin:0; color:#ffffff; font-size:26px; line-height:1.3; font-weight:700;">
+            Đặt lịch xem phòng thành công!
+          </h1>
+          <p style="margin:8px 0 0 0; color:rgba(255,255,255,.9); font-size:15px; line-height:1.6;">
+            Cảm ơn bạn đã tin tưởng StayHub
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:36px 28px 8px 28px;">
+          <!-- Greeting -->
+          <div style="margin:0 0 22px 0;">
+            <h2 style="margin:0 0 8px 0; color:#1f2937; font-size:20px; line-height:1.5; font-weight:700;">Xin chào ${customerName} 👋</h2>
+            <p style="margin:0; color:#4b5563; font-size:15px; line-height:1.75;">
+              Chúng tôi đã nhận được yêu cầu đặt lịch xem phòng của bạn. Dưới đây là thông tin chi tiết về cuộc hẹn:
+            </p>
+          </div>
+
+          <!-- Appointment Details -->
+          <div style="background-color:#f7fafc; border:1px solid #e5e7eb; border-radius:12px; padding:20px; margin-bottom:22px;">
+            <h3 style="margin:0 0 14px 0; color:#4f46e5; font-size:16px; font-weight:700; display:flex; align-items:center;">
+              <span style="margin-right:8px;">📅</span> Thông tin lịch hẹn
+            </h3>
+
+            <div style="display:block;">
+              <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                <div style="min-width:130px; color:#6b7280; font-weight:600;">Ngày hẹn:</div>
+                <div style="color:#111827; font-weight:600;">${formatDate(viewingDate)}</div>
+              </div>
+              <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                <div style="min-width:130px; color:#6b7280; font-weight:600;">Thời gian:</div>
+                <div style="color:#111827; font-weight:600;">${viewingTime}</div>
+              </div>
+              <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                <div style="min-width:130px; color:#6b7280; font-weight:600;">Trạng thái:</div>
+                <div style="background-color:#22c55e; color:#ffffff; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; display:inline-block;">
+                  ✓ ĐÃ XÁC NHẬN
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Room Info -->
+          <div style="background-color:#f7fafc; border:1px solid #e5e7eb; border-radius:12px; padding:20px; margin-bottom:22px;">
+            <h3 style="margin:0 0 14px 0; color:#4f46e5; font-size:16px; font-weight:700; display:flex; align-items:center;">
+              <span style="margin-right:8px;">🏠</span> Thông tin phòng trọ
+            </h3>
+            <div>
+              <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                <div style="min-width:130px; color:#6b7280; font-weight:600;">Tên phòng:</div>
+                <div style="color:#111827; font-weight:700;">${roomName}</div>
+              </div>
+              <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                <div style="min-width:130px; color:#6b7280; font-weight:600;">Giá phòng:</div>
+                <div style="color:#dc2626; font-weight:800; font-size:18px;">${formatPrice(
+                  roomPrice
+                )}/tháng</div>
+              </div>
+              <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                <div style="min-width:130px; color:#6b7280; font-weight:600;">Tòa nhà:</div>
+                <div style="color:#111827; font-weight:700;">${buildingName}</div>
+              </div>
+              <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                <div style="min-width:130px; color:#6b7280; font-weight:600;">Địa chỉ:</div>
+                <div style="color:#111827;">${
+                  typeof buildingAddress === 'string'
+                    ? buildingAddress
+                    : buildingAddress?.address ||
+                      buildingAddress?.street ||
+                      'Địa chỉ không xác định'
+                }</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Landlord -->
+          <div style="background-color:#f0fff4; border:1px solid #bbf7d0; border-radius:12px; padding:20px; margin-bottom:22px;">
+            <h3 style="margin:0 0 14px 0; color:#16a34a; font-size:16px; font-weight:700; display:flex; align-items:center;">
+              <span style="margin-right:8px;">👤</span> Thông tin chủ nhà
+            </h3>
+            <div>
+              <div style="display:flex; padding:10px 0; border-top:1px solid #d1fae5;">
+                <div style="min-width:130px; color:#15803d; font-weight:700;">Tên chủ nhà:</div>
+                <div style="color:#0f172a; font-weight:700;">${landlordName}</div>
+              </div>
+              <div style="display:flex; padding:10px 0; border-top:1px solid #d1fae5;">
+                <div style="min-width:130px; color:#15803d; font-weight:700;">Số điện thoại:</div>
+                <div style="color:#0f172a; font-weight:700;">
+                  <a href="tel:${landlordPhone}" style="color:#16a34a; text-decoration:none;">${landlordPhone}</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          ${
+            notes
+              ? `
+          <!-- Notes -->
+          <div style="background-color:#fffaf0; border:1px solid #fde68a; border-radius:12px; padding:18px; margin-bottom:22px;">
+            <h3 style="margin:0 0 10px 0; color:#b45309; font-size:15px; font-weight:700; display:flex; align-items:center;">
+              <span style="margin-right:8px;">📝</span> Ghi chú
+            </h3>
+            <p style="margin:0; color:#7c4a03; font-size:14px; line-height:1.7; font-style:italic;">"${notes}"</p>
+          </div>`
+              : ''
+          }
+
+          <!-- Important -->
+          <div style="background-color:#fff7ed; border-left:4px solid #fb923c; padding:16px 18px; border-radius:0 10px 10px 0; margin-bottom:22px;">
+            <h4 style="margin:0 0 8px 0; color:#9a3412; font-size:14px;">⚠️ Lưu ý quan trọng:</h4>
+            <ul style="margin:0; padding-left:18px; color:#7c2d12; line-height:1.8; font-size:14px;">
+              <li>Vui lòng đến đúng giờ đã hẹn</li>
+              <li>Mang theo CMND/CCCD để xác minh thông tin</li>
+              <li>Nếu có thay đổi, vui lòng liên hệ chủ nhà trước ít nhất 2 tiếng</li>
+              <li>Chuẩn bị sẵn các câu hỏi muốn tìm hiểu về phòng trọ</li>
+            </ul>
+          </div>
+
+          <!-- CTA Buttons -->
+          <div style="text-align:center; margin:28px 0 10px 0;">
+            <a href="tel:${landlordPhone}" style="background:linear-gradient(135deg,#22c55e,#16a34a); color:#ffffff; padding:14px 22px; text-decoration:none; border-radius:10px; display:inline-block; font-weight:800; box-shadow:0 6px 16px rgba(22,163,74,.25); margin:0 6px;">
+              📞 Gọi chủ nhà
+            </a>
+            <a href="${SITE}" style="background:linear-gradient(135deg,#667eea,#764ba2); color:#ffffff; padding:14px 22px; text-decoration:none; border-radius:10px; display:inline-block; font-weight:800; box-shadow:0 6px 16px rgba(103,116,236,.25); margin:0 6px;">
+              🏠 Xem thêm phòng
+            </a>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color:#f8fafc; padding:24px 28px; border-top:1px solid #e6ebf1; text-align:center;">
+          <p style="margin:0 0 12px 0; color:#374151; font-size:13px;">Cảm ơn bạn đã sử dụng dịch vụ của StayHub!</p>
+          <div style="margin-bottom:14px;">
+            <a href="mailto:support@stayhub.com" style="color:#4f46e5; text-decoration:none; margin:0 10px;">📧 support@stayhub.com</a>
+            <a href="tel:1900-1234" style="color:#4f46e5; text-decoration:none; margin:0 10px;">📞 1900-1234</a>
+          </div>
+          <p style="margin:0; color:#9ca3af; font-size:12px;">© 2025 StayHub. Tất cả quyền được bảo lưu.</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+    `;
+    },
+  },
+
+  /**
+   * Viewing appointment confirmation - For tenant/guest
+   */
+  VIEWING_APPOINTMENT_RENTER: {
+    subject: 'Xác nhận lịch hẹn xem phòng - StayHub',
+    getContent: (data) => `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 650px; margin: 0 auto; padding: 0; background-color: #f8f9fa;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">📅 Xác nhận lịch hẹn</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 16px;">Bạn đã đặt lịch xem phòng thành công!</p>
+        </div>
+        
+        <!-- Content -->
+        <div style="background-color: white; padding: 40px 30px;">
+          <p style="color: #2c3e50; font-size: 16px; margin: 0 0 25px 0;">Xin chào <strong>${
+            data.renterName
+          }</strong>,</p>
+          
+          <p style="color: #34495e; line-height: 1.6; margin: 0 0 25px 0;">
+            Cảm ơn bạn đã sử dụng StayHub! Lịch hẹn xem phòng của bạn đã được ghi nhận thành công.
+          </p>
+          
+          <!-- Appointment Details -->
+          <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 12px; padding: 25px; margin: 25px 0;">
+            <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px;">📋 Thông tin lịch hẹn</h3>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+              <div style="flex: 1; min-width: 250px;">
+                <div style="margin-bottom: 15px;">
+                  <span style="display: inline-block; width: 100px; color: #7f8c8d; font-weight: 600;">📅 Ngày:</span>
+                  <span style="color: #2c3e50; font-weight: 600;">${data.viewingDate}</span>
+                </div>
+                <div style="margin-bottom: 15px;">
+                  <span style="display: inline-block; width: 100px; color: #7f8c8d; font-weight: 600;">🕐 Giờ:</span>
+                  <span style="color: #2c3e50; font-weight: 600;">${data.viewingTime}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Room Details -->
+          <div style="border: 2px solid #e74c3c; border-radius: 12px; padding: 25px; margin: 25px 0;">
+            <h3 style="color: #e74c3c; margin: 0 0 20px 0; font-size: 18px;">🏠 Thông tin phòng trọ</h3>
+            
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Tên phòng:</span>
+              <span style="color: #2c3e50; font-weight: 600;">${data.roomName}</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Giá thuê:</span>
+              <span style="color: #e74c3c; font-weight: 600; font-size: 18px;">${
+                typeof data.roomPrice === 'number'
+                  ? data.roomPrice.toLocaleString('vi-VN') + '₫'
+                  : 'Liên hệ'
+              }/tháng</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Địa chỉ:</span>
+              <span style="color: #2c3e50;">${
+                typeof data.roomAddress === 'string'
+                  ? data.roomAddress
+                  : data.roomAddress?.address ||
+                    data.roomAddress?.street ||
+                    'Địa chỉ không xác định'
+              }</span>
+            </div>
+          </div>
+          
+          <!-- Landlord Contact -->
+          <div style="background-color: #ecf0f1; border-radius: 12px; padding: 25px; margin: 25px 0;">
+            <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px;">👤 Thông tin chủ trọ</h3>
+            
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Họ tên:</span>
+              <span style="color: #2c3e50; font-weight: 600;">${data.landlordName}</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Điện thoại:</span>
+              <span style="color: #2c3e50; font-weight: 600;">${data.landlordPhone}</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Email:</span>
+              <span style="color: #2c3e50;">${data.landlordEmail}</span>
+            </div>
+          </div>
+          
+          <!-- Important Notes -->
+          <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0;">
+            <h4 style="color: #856404; margin: 0 0 15px 0; font-size: 16px;">⚠️ Lưu ý quan trọng:</h4>
+            <ul style="color: #856404; margin: 0; padding-left: 20px; line-height: 1.6;">
+              <li>Vui lòng đến đúng giờ hẹn để tránh ảnh hưởng đến lịch của chủ trọ</li>
+              <li>Mang theo giấy tờ tùy thân để xác minh danh tính</li>
+              <li>Liên hệ với chủ trọ trước 24h nếu cần thay đổi lịch hẹn</li>
+              <li>Chuẩn bị các câu hỏi về phòng trọ, tiện ích, điều khoản thuê</li>
+            </ul>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="tel:${
+              data.landlordPhone
+            }" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; display: inline-block; margin: 5px 10px; font-weight: 600;">📞 Gọi chủ trọ</a>
+            <a href="${process.env.FRONTEND_URL}/rooms/${
+      data.roomId
+    }" style="background: linear-gradient(135deg, #007bff 0%, #6f42c1 100%); color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; display: inline-block; margin: 5px 10px; font-weight: 600;">🏠 Xem chi tiết phòng</a>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background-color: #2c3e50; padding: 25px 30px; text-align: center;">
+          <p style="color: #bdc3c7; margin: 0 0 10px 0; font-size: 14px;">
+            Email này được gửi tự động từ hệ thống StayHub
+          </p>
+          <p style="color: #95a5a6; margin: 0; font-size: 12px;">
+            © 2025 StayHub. Tất cả quyền được bảo lưu.
+          </p>
+        </div>
+      </div>
+    `,
+  },
+
+  /**
+   * Viewing appointment notification - For landlord
+   */
+  VIEWING_APPOINTMENT_LANDLORD: {
+    subject: 'Thông báo lịch hẹn xem phòng mới - StayHub',
+    getContent: (data) => `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 650px; margin: 0 auto; padding: 0; background-color: #f8f9fa;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); padding: 30px 20px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">🔔 Lịch hẹn mới</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 16px;">Có khách hàng muốn xem phòng của bạn!</p>
+        </div>
+        
+        <!-- Content -->
+        <div style="background-color: white; padding: 40px 30px;">
+          <p style="color: #2c3e50; font-size: 16px; margin: 0 0 25px 0;">Xin chào <strong>${
+            data.landlordName
+          }</strong>,</p>
+          
+          <p style="color: #34495e; line-height: 1.6; margin: 0 0 25px 0;">
+            Bạn có một lịch hẹn xem phòng mới từ khách hàng quan tâm. Vui lòng xem thông tin chi tiết bên dưới:
+          </p>
+          
+          <!-- Appointment Details -->
+          <div style="background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%); border-radius: 12px; padding: 25px; margin: 25px 0;">
+            <h3 style="color: #2d3436; margin: 0 0 20px 0; font-size: 18px;">📋 Thông tin lịch hẹn</h3>
+            
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 100px; color: #636e72; font-weight: 600;">📅 Ngày:</span>
+              <span style="color: #2d3436; font-weight: 600;">${data.viewingDate}</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 100px; color: #636e72; font-weight: 600;">🕐 Giờ:</span>
+              <span style="color: #2d3436; font-weight: 600;">${data.viewingTime}</span>
+            </div>
+          </div>
+          
+          <!-- Customer Details -->
+          <div style="border: 2px solid #0984e3; border-radius: 12px; padding: 25px; margin: 25px 0;">
+            <h3 style="color: #0984e3; margin: 0 0 20px 0; font-size: 18px;">👤 Thông tin khách hàng</h3>
+            
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Họ tên:</span>
+              <span style="color: #2c3e50; font-weight: 600;">${data.renterName}</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Điện thoại:</span>
+              <span style="color: #2c3e50; font-weight: 600;">${data.renterPhone}</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Email:</span>
+              <span style="color: #2c3e50;">${data.renterEmail}</span>
+            </div>
+            ${
+              data.notes
+                ? `
+            <div style="margin-top: 20px;">
+              <span style="display: block; color: #7f8c8d; font-weight: 600; margin-bottom: 8px;">Ghi chú:</span>
+              <div style="background-color: #f8f9fa; padding: 12px; border-radius: 6px; color: #2c3e50;">
+                ${data.notes}
+              </div>
+            </div>
+            `
+                : ''
+            }
+          </div>
+          
+          <!-- Room Details -->
+          <div style="background-color: #ddd6fe; border-radius: 12px; padding: 25px; margin: 25px 0;">
+            <h3 style="color: #6366f1; margin: 0 0 20px 0; font-size: 18px;">🏠 Thông tin phòng</h3>
+            
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Tên phòng:</span>
+              <span style="color: #2c3e50; font-weight: 600;">${data.roomName}</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Giá thuê:</span>
+              <span style="color: #e74c3c; font-weight: 600; font-size: 18px;">${
+                typeof data.roomPrice === 'number'
+                  ? data.roomPrice.toLocaleString('vi-VN') + '₫'
+                  : 'Liên hệ'
+              }/tháng</span>
+            </div>
+            <div style="margin-bottom: 15px;">
+              <span style="display: inline-block; width: 120px; color: #7f8c8d; font-weight: 600;">Địa chỉ:</span>
+              <span style="color: #2c3e50;">${
+                typeof data.roomAddress === 'string'
+                  ? data.roomAddress
+                  : data.roomAddress?.address ||
+                    data.roomAddress?.street ||
+                    'Địa chỉ không xác định'
+              }</span>
+            </div>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="tel:${
+              data.renterPhone
+            }" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; display: inline-block; margin: 5px 10px; font-weight: 600;">📞 Gọi khách hàng</a>
+            <a href="mailto:${
+              data.renterEmail
+            }" style="background: linear-gradient(135deg, #ffc107 0%, #ff8f00 100%); color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; display: inline-block; margin: 5px 10px; font-weight: 600;">📧 Gửi email</a>
+          </div>
+          
+          <!-- Important Notes -->
+          <div style="background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0;">
+            <h4 style="color: #0c5460; margin: 0 0 15px 0; font-size: 16px;">💡 Gợi ý:</h4>
+            <ul style="color: #0c5460; margin: 0; padding-left: 20px; line-height: 1.6;">
+              <li>Liên hệ với khách hàng để xác nhận lại thời gian</li>
+              <li>Chuẩn bị phòng sạch sẽ, gọn gàng trước khi khách đến xem</li>
+              <li>Chuẩn bị thông tin về tiện ích, quy định của khu vực</li>
+              <li>Mang theo hợp đồng mẫu nếu khách hàng quyết định thuê</li>
+            </ul>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background-color: #2c3e50; padding: 25px 30px; text-align: center;">
+          <p style="color: #bdc3c7; margin: 0 0 10px 0; font-size: 14px;">
+            Email này được gửi tự động từ hệ thống StayHub
+          </p>
+          <p style="color: #95a5a6; margin: 0; font-size: 12px;">
+            © 2025 StayHub. Tất cả quyền được bảo lưu.
+          </p>
+        </div>
+      </div>
+    `,
+  },
 };
 
 module.exports = emailTemplates;

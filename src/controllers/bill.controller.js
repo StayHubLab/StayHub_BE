@@ -82,13 +82,11 @@ exports.getBillsByContractId = async (req, res) => {
     res.status(200).json({ success: true, message: 'Bills retrieved successfully', data: bills });
   } catch (error) {
     logger.error('Error getting bills by contract ID:', error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: 'Error getting bills by contract ID',
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: 'Error getting bills by contract ID',
+      error: error.message,
+    });
   }
 };
 
@@ -106,4 +104,3 @@ exports.markBillPaid = async (req, res) => {
       .json({ success: false, message: 'Error marking bill as paid', error: error.message });
   }
 };
-

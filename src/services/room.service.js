@@ -31,7 +31,18 @@ class RoomService {
       const query = Room.find(filters);
 
       const [rooms, total] = await Promise.all([
-        query.skip(skip).limit(limit).lean(),
+        query
+          .skip(skip)
+          .limit(limit)
+          .populate('buildingId', 'name address hostId createdAt')
+          .populate({
+            path: 'buildingId',
+            populate: {
+              path: 'hostId',
+              select: 'name email phone avatar createdAt rating isVerified',
+            },
+          })
+          .lean(),
         Room.countDocuments(filters),
       ]);
 
@@ -71,7 +82,16 @@ class RoomService {
         throw new ValidationError('Invalid room ID format');
       }
 
-      const room = await Room.findById(roomId).lean();
+      const room = await Room.findById(roomId)
+        .populate('buildingId', 'name address hostId createdAt')
+        .populate({
+          path: 'buildingId',
+          populate: {
+            path: 'hostId',
+            select: 'name email phone avatar createdAt rating isVerified',
+          },
+        })
+        .lean();
       logger.info('RoomService: Room query result', {
         roomId,
         found: !!room,

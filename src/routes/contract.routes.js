@@ -32,4 +32,3 @@ router.delete('/:id', auth, roleMiddleware('landlord', 'admin'), deleteContract)
 router.put('/:id/terminate', auth, roleMiddleware('landlord', 'admin'), terminateContract);
 
 module.exports = router;
-
