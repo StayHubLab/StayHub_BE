@@ -151,4 +151,3 @@ class ContractService {
 }
 
 module.exports = ContractService;
-

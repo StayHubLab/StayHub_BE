@@ -139,4 +139,3 @@ class BillService {
 }
 
 module.exports = BillService;
-

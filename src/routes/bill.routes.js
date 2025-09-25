@@ -28,4 +28,3 @@ router.put('/:id/pay', auth, markBillPaid);
 router.delete('/:id', auth, roleMiddleware('landlord', 'admin'), deleteBill);
 
 module.exports = router;
-

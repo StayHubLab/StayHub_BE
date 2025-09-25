@@ -27,6 +27,7 @@ const roomRoutes = require('./routes/room.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const contractRoutes = require('./routes/contract.routes');
 const billRoutes = require('./routes/bill.routes');
+const viewingRoutes = require('./routes/viewing.routes');
 
 // Import middleware
 const { auth } = require('./middlewares/auth.middleware');
@@ -110,6 +111,7 @@ app.get('/health', (req, res) => {
 // API Routes - Order matters!
 app.use('/api/buildings', buildingRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/viewings', viewingRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', auth, userRoutes);
 app.use('/api/email', auth, emailRoutes);

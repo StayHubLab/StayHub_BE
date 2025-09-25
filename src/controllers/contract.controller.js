@@ -100,13 +100,11 @@ exports.getContractsByUserId = async (req, res) => {
       .json({ success: true, message: 'Contracts retrieved successfully', data: contracts });
   } catch (error) {
     logger.error('Error getting contracts by user ID:', error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: 'Error getting contracts by user ID',
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: 'Error getting contracts by user ID',
+      error: error.message,
+    });
   }
 };
 
@@ -123,13 +121,11 @@ exports.getContractsByRoomId = async (req, res) => {
       .json({ success: true, message: 'Contracts retrieved successfully', data: contracts });
   } catch (error) {
     logger.error('Error getting contracts by room ID:', error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: 'Error getting contracts by room ID',
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: 'Error getting contracts by room ID',
+      error: error.message,
+    });
   }
 };
 
@@ -149,4 +145,3 @@ exports.terminateContract = async (req, res) => {
       .json({ success: false, message: 'Error terminating contract', error: error.message });
   }
 };
-
