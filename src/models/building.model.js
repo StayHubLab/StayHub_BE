@@ -24,7 +24,7 @@ const buildingSchema = new mongoose.Schema(
     address: {
       street: { type: String, required: true, trim: true },
       ward: { type: String, required: true, trim: true },
-      district: { type: String, required: true, trim: true },
+      district: { type: String, required: false, trim: true },
       city: { type: String, required: true, trim: true },
       coordinates: {
         lat: { type: Number, required: true, min: -90, max: 90 },

@@ -16,34 +16,25 @@ const ContactRequestSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    guestInfo: {
-      name: {
-        type: String,
-        required: true,
-        trim: true,
-        maxLength: 100,
-      },
-      phone: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-      email: {
-        type: String,
-        trim: true,
-        lowercase: true,
-      },
-      message: {
-        type: String,
-        required: true,
-        trim: true,
-        maxLength: 1000,
-      },
+    guestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: false,
+      index: true,
     },
     isHandled: {
       type: Boolean,
       default: false,
       index: true,
+    },
+    tenantSignature: {
+      type: String, // base64 PNG khi người thuê ký duyệt
     },
     handledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     handledAt: Date,

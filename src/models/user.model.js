@@ -122,8 +122,28 @@ const userSchema = new mongoose.Schema(
       },
     },
     avatar: {
-      type: String,
-      default: 'https://example.com/default-avatar.png',
+      url: {
+        type: String,
+        default: 'https://example.com/default-avatar.png',
+      },
+      public_id: {
+        type: String, // Cloudinary public_id for deletion
+      },
+      width: {
+        type: Number,
+      },
+      height: {
+        type: Number,
+      },
+      format: {
+        type: String,
+      },
+      size: {
+        type: Number, // File size in bytes
+      },
+      uploadedAt: {
+        type: Date,
+      },
     },
     rating: {
       type: Number,

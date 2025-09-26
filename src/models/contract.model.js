@@ -116,6 +116,16 @@ const ContractSchema = new mongoose.Schema(
       approvedAt: Date,
       approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     },
+    signatures: {
+      landlord: {
+        type: String, // base64 PNG
+      },
+      tenant: {
+        type: String, // base64 PNG
+      },
+      landlordSignedAt: Date,
+      tenantSignedAt: Date,
+    },
   },
   {
     timestamps: true,

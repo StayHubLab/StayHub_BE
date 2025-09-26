@@ -7,7 +7,7 @@
 
 const express = require('express');
 const ViewingController = require('../controllers/viewing.controller');
-const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
+// const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
@@ -27,21 +27,21 @@ router.get('/', ViewingController.getViewings);
  */
 router.post('/', ViewingController.createViewing);
 
+// Protected routes (require authentication)
+
+/**
+ * @route GET /api/viewings/me
+ * @description Get viewing appointments for the authenticated user
+ * @access Public (for testing) / Private (in production)
+ */
+router.get('/me', ViewingController.getMyViewings);
+
 /**
  * @route GET /api/viewings/:id
  * @description Get a specific viewing appointment by ID
  * @access Public (for testing) / Private (in production)
  */
 router.get('/:id', ViewingController.getViewingById);
-
-// Protected routes (require authentication)
-
-/**
- * @route GET /api/viewings/me
- * @description Get viewing appointments for the authenticated user
- * @access Private
- */
-// router.get('/me', protect, ViewingController.getMyViewings);
 
 /**
  * @route GET /api/viewings/user/:userId

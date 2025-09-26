@@ -12,6 +12,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
+const { verifyConfig } = require('./config/cloudinary');
 const logger = require('./utils/logger');
 const { errorHandler } = require('./middlewares/error.middleware');
 
@@ -24,10 +25,13 @@ const renterRoutes = require('./routes/renter.routes');
 const adminRoutes = require('./routes/admin.routes');
 const buildingRoutes = require('./routes/building.routes');
 const roomRoutes = require('./routes/room.routes');
+const contactRequestRoutes = require('./routes/contact-request.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const contractRoutes = require('./routes/contract.routes');
 const billRoutes = require('./routes/bill.routes');
+const paymentRoutes = require('./routes/payment.routes');
 const viewingRoutes = require('./routes/viewing.routes');
+const savedRoomRoutes = require('./routes/saved-room.routes');
 
 // Import middleware
 const { auth } = require('./middlewares/auth.middleware');
@@ -35,15 +39,16 @@ const { auth } = require('./middlewares/auth.middleware');
 const app = express();
 
 // Security middleware
+// Helmet (CSP: must use quoted keywords like '\'self\'')
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ['self'],
-        scriptSrc: ['self', 'unsafe-inline'],
-        styleSrc: ['self', 'unsafe-inline'],
-        imgSrc: ['self', 'data:', 'https:'],
-        connectSrc: ['self'],
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
       },
     },
   })
@@ -52,10 +57,20 @@ app.use(
 // Rate limiting with optimized settings
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req, _res) => {
+    // Skip rate limiting in development for localhost
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip.includes('localhost'))
+    ) {
+      return true;
+    }
+    return false;
+  },
 });
 
 // Apply rate limiting to all routes
@@ -111,9 +126,11 @@ app.get('/health', (req, res) => {
 // API Routes - Order matters!
 app.use('/api/buildings', buildingRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/contact-requests', contactRequestRoutes);
 app.use('/api/viewings', viewingRoutes);
+app.use('/api/saved-rooms', savedRoomRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/users', auth, userRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/email', auth, emailRoutes);
 app.use('/api/landlord', auth, landlordRoutes);
 app.use('/api/renter', auth, renterRoutes);
@@ -121,11 +138,69 @@ app.use('/api/admin', auth, adminRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/bills', billRoutes);
+app.use('/api/payments', paymentRoutes);
+
+// DEBUG: list all registered routes (temp) -----------------
+if (process.env.LIST_ROUTES === 'true') {
+  const listRoutes = () => {
+    const table = [];
+    const pushRoute = (method, path) => table.push({ method, path });
+    app._router.stack.forEach((layer) => {
+      if (layer.route && layer.route.path) {
+        const methods = Object.keys(layer.route.methods);
+        methods.forEach((m) => pushRoute(m.toUpperCase(), layer.route.path));
+      } else if (layer.name === 'router' && layer.handle.stack) {
+        const base =
+          layer.regexp &&
+          layer.regexp.source
+            .replace('^\\', '/')
+            .replace('\\/?(?=\\/|$)', '')
+            .replace('(?=\\/|$)', '')
+            .replace('^', '')
+            .replace('$', '');
+        layer.handle.stack.forEach((r) => {
+          if (r.route && r.route.path) {
+            const methods = Object.keys(r.route.methods);
+            methods.forEach((m) => pushRoute(m.toUpperCase(), `${base}${r.route.path}`));
+          }
+        });
+      }
+    });
+    if (process.env.LIST_ROUTES_TABLE === 'true') {
+      // optional table dump
+      // eslint-disable-next-line no-console
+      console.table(table);
+    }
+  };
+  listRoutes();
+}
+// ---------------------------------------------------------
+
+// Add explicit 404 fallback before error handler if missing
+app.use((req, res, next) => {
+  if (res.headersSent) return next();
+  return res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    method: req.method,
+    path: req.originalUrl,
+  });
+});
 
 // Error handling middleware
 app.use(errorHandler);
 
 // Start server function with improved error handling
+// Global crash diagnostics (keep lightweight)
+process.on('unhandledRejection', (err) => {
+  // eslint-disable-next-line no-console
+  console.error('[UNHANDLED_REJECTION]', err);
+});
+process.on('uncaughtException', (err) => {
+  // eslint-disable-next-line no-console
+  console.error('[UNCAUGHT_EXCEPTION]', err);
+});
+
 const startServer = async () => {
   try {
     logger.info('Starting server initialization...');
@@ -136,7 +211,18 @@ const startServer = async () => {
       CORS_ORIGIN: process.env.CORS_ORIGIN,
     });
 
-    await connectDB();
+    // Optionally skip DB for debugging (set SKIP_DB=1)
+    if (process.env.SKIP_DB === '1') {
+      logger.warn('SKIP_DB=1 set -> Skipping MongoDB connection (debug mode)');
+    } else {
+      if (!process.env.MONGODB_URI) {
+        logger.error(
+          'MONGODB_URI is missing. Set it in .env or export before starting the server.'
+        );
+        return process.exit(1);
+      }
+      await connectDB();
+    }
     const PORT = process.env.PORT || 5000;
 
     const server = app.listen(PORT, () => {
@@ -153,13 +239,16 @@ const startServer = async () => {
     });
 
     server.on('error', (error) => {
-      logger.error('Server failed to start:', {
+      logger.error('Database connection error:', {
         error: error.message,
         stack: error.stack,
         code: error.code,
       });
       process.exit(1);
     });
+
+    // Verify Cloudinary configuration
+    verifyConfig();
   } catch (error) {
     logger.error('Application startup failed:', {
       error: error.message,

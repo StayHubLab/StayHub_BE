@@ -1,4 +1,44 @@
 /**
+ * @file Contract Controller - Signature endpoints
+ */
+
+const Contract = require('../models/contract.model');
+
+// Update signatures (base64) for a contract
+exports.updateSignatures = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { landlord, tenant } = req.body || {};
+
+    const update = {};
+    if (landlord) {
+      update['signatures.landlord'] = landlord;
+      update['signatures.landlordSignedAt'] = new Date();
+    }
+    if (tenant) {
+      update['signatures.tenant'] = tenant;
+      update['signatures.tenantSignedAt'] = new Date();
+    }
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, message: 'No signature provided' });
+    }
+
+    const updated = await Contract.findByIdAndUpdate(id, { $set: update }, { new: true })
+      .select('signatures status updatedAt')
+      .lean();
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Contract not found' });
+    }
+
+    res.json({ success: true, message: 'Signatures updated', data: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @fileoverview Contract Controller - Handles HTTP requests for contracts
  * @created 2025-09-22
  * @file contract.controller.js
@@ -143,5 +183,26 @@ exports.terminateContract = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: 'Error terminating contract', error: error.message });
+  }
+};
+
+// GET /api/contracts/host/:hostId
+exports.getContractsByHostId = async (req, res) => {
+  try {
+    const { hostId } = req.params;
+    if (!hostId || !mongoose.Types.ObjectId.isValid(hostId)) {
+      return res.status(400).json({ success: false, message: 'Invalid host ID format' });
+    }
+    const contracts = await ContractService.getContractsByHostId(hostId);
+    res
+      .status(200)
+      .json({ success: true, message: 'Contracts retrieved successfully', data: contracts });
+  } catch (error) {
+    logger.error('Error getting contracts by host ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting contracts by host ID',
+      error: error.message,
+    });
   }
 };
