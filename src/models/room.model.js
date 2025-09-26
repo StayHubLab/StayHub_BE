@@ -39,6 +39,21 @@ const roomSchema = new mongoose.Schema(
           type: String,
           required: true,
         },
+        public_id: {
+          type: String, // Cloudinary public_id for deletion
+        },
+        width: {
+          type: Number,
+        },
+        height: {
+          type: Number,
+        },
+        format: {
+          type: String,
+        },
+        size: {
+          type: Number, // File size in bytes
+        },
         isVerified: { type: Boolean, default: false },
         uploadedAt: { type: Date, default: Date.now },
       },

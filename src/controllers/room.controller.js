@@ -15,13 +15,10 @@ const logger = require('../utils/logger');
  */
 exports.getAllRooms = async (req, res) => {
   try {
-    const rooms = await RoomService.getAllRooms(req.query);
-    res.status(200).json({
-      success: true,
-      message: 'Rooms retrieved successfully',
-      data: rooms,
-    });
-    logger.info('Rooms retrieved successfully');
+    logger.info('Getting all rooms with query:', req.query);
+    const result = await RoomService.getAllRooms(req.query);
+    logger.info('Rooms retrieved successfully. Count:', result.data?.rooms?.length || 0);
+    res.status(200).json(result);
   } catch (error) {
     logger.error('Error getting all rooms:', error);
     res.status(500).json({
@@ -78,8 +75,44 @@ exports.getRoomById = async (req, res) => {
  */
 exports.createRoom = async (req, res) => {
   try {
-    const roomData = req.body;
+    logger.info('CreateRoom - received data:', {
+      body: req.body,
+      files: req.files
+        ? req.files.map((f) => ({ fieldname: f.fieldname, filename: f.filename }))
+        : [],
+      contentType: req.headers['content-type'],
+    });
+
+    // Process FormData fields
+    const roomData = { ...req.body };
+
+    // Convert string numbers to actual numbers
+    if (roomData.area) roomData.area = parseInt(roomData.area);
+    if (roomData.capacity) roomData.capacity = parseInt(roomData.capacity);
+
+    // Convert boolean strings
+    if (roomData.isAvailable) {
+      roomData.isAvailable = roomData.isAvailable === 'true';
+    }
+
+    // Handle uploaded images from Cloudinary
+    if (req.cloudinaryResults && req.cloudinaryResults.length > 0) {
+      roomData.images = req.cloudinaryResults.map((result) => ({
+        url: result.secure_url,
+        public_id: result.public_id,
+        width: result.width,
+        height: result.height,
+        format: result.format,
+        size: result.size,
+        isVerified: false,
+        uploadedAt: new Date(),
+      }));
+    }
+
+    logger.info('Processed room data:', roomData);
+
     const newRoom = await RoomService.createRoom(roomData);
+
     res.status(201).json({
       success: true,
       message: 'Room created successfully',
@@ -106,7 +139,50 @@ exports.createRoom = async (req, res) => {
 exports.updateRoom = async (req, res) => {
   try {
     const roomId = req.params.id;
-    const updateData = req.body;
+
+    logger.info('UpdateRoom - received data:', {
+      body: req.body,
+      files: req.files
+        ? req.files.map((f) => ({ fieldname: f.fieldname, filename: f.filename }))
+        : [],
+      cloudinaryResults: req.cloudinaryResults ? req.cloudinaryResults.length : 0,
+      contentType: req.headers['content-type'],
+    });
+
+    // Process FormData fields
+    const updateData = { ...req.body };
+
+    // Convert string numbers to actual numbers
+    if (updateData.area) updateData.area = parseInt(updateData.area);
+    if (updateData.capacity) updateData.capacity = parseInt(updateData.capacity);
+
+    // Convert boolean strings
+    if (updateData.isAvailable) {
+      updateData.isAvailable = updateData.isAvailable === 'true';
+    }
+
+    // Handle uploaded images from Cloudinary
+    if (req.cloudinaryResults && req.cloudinaryResults.length > 0) {
+      updateData.newImages = req.cloudinaryResults.map((result) => ({
+        url: result.secure_url,
+        public_id: result.public_id,
+        width: result.width,
+        height: result.height,
+        format: result.format,
+        size: result.size,
+        isVerified: false,
+        uploadedAt: new Date(),
+      }));
+    }
+
+    // Clean up any nested arrays in images field (shouldn't happen but safety check)
+    if (updateData.images && Array.isArray(updateData.images)) {
+      logger.warn('Unexpected images array detected, removing it:', updateData.images);
+      delete updateData.images; // Remove images field as it should be handled by newImages/existingImages
+    }
+
+    logger.info('Update room data:', { roomId, updateData });
+
     const updatedRoom = await RoomService.updateRoom(roomId, updateData);
     res.status(200).json({
       success: true,
@@ -164,6 +240,7 @@ exports.searchRooms = async (req, res) => {
     const keyword = req.query.keyword || req.body.keyword;
     const page = parseInt(req.query.page || req.body.page || 1);
     const limit = parseInt(req.query.limit || req.body.limit || 10);
+    const landlordId = req.query.landlordId || req.body.landlordId;
 
     logger.info('Searching rooms:', { keyword, page, limit });
 
@@ -174,7 +251,7 @@ exports.searchRooms = async (req, res) => {
       });
     }
 
-    const searchResults = await RoomService.searchRooms(keyword, { page, limit });
+    const searchResults = await RoomService.searchRooms(keyword, { page, limit, landlordId });
     res.status(200).json({
       success: true,
       message: 'Rooms search completed',
@@ -232,6 +309,78 @@ exports.filterRooms = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error filtering rooms',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @route DELETE /api/rooms/:id/images/:imageId
+ * @description Delete specific room image
+ * @param {string} id - Room ID
+ * @param {string} imageId - Image public_id to delete
+ * @returns {Object} Success message
+ */
+exports.deleteRoomImage = async (req, res) => {
+  try {
+    const { id: roomId, imageId } = req.params;
+
+    logger.info('Deleting room image:', { roomId, imageId });
+
+    if (!roomId || !imageId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Room ID and Image ID are required',
+      });
+    }
+
+    const result = await RoomService.deleteRoomImage(roomId, imageId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Room image deleted successfully',
+      data: result,
+    });
+
+    logger.info('Room image deleted successfully');
+  } catch (error) {
+    logger.error('Error deleting room image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting room image',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @route GET /api/rooms/:id/contract
+ * @description Get contract information for a room
+ * @param {string} id - Room ID
+ * @returns {Object} Contract data with tenant information
+ */
+exports.getRoomContractInfo = async (req, res) => {
+  try {
+    const roomId = req.params.id;
+    logger.info('Getting contract info for room:', { roomId });
+
+    if (!roomId) {
+      logger.error('Room ID is missing');
+      return res.status(400).json({
+        success: false,
+        message: 'Room ID is required',
+      });
+    }
+
+    const result = await RoomService.getRoomContractInfo(roomId);
+    logger.info('Contract info retrieved successfully for room:', roomId);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    logger.error('Error getting room contract info:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error getting room contract info',
       error: error.message,
     });
   }

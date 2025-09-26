@@ -6,10 +6,13 @@
  */
 
 const Room = require('../models/room.model');
+const Building = require('../models/building.model');
+// const User = require('../models/user.model'); // Not used in this service
+const Contract = require('../models/contract.model');
+const ImageService = require('./image.service');
 const logger = require('../utils/logger');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const mongoose = require('mongoose');
-const Building = require('../models/building.model');
 
 /**
  * @class RoomService
@@ -19,21 +22,144 @@ class RoomService {
   /**
    * @route GET /api/rooms
    * @description Get all rooms with pagination and filters
-   * @param {Object} options - Query options
-   * @param {number} options.page - Page number
-   * @param {number} options.limit - Items per page
-   * @param {Object} options.filters - Filter criteria
+   * @param {Object} queryParams - Query parameters from request
+   * @param {number} queryParams.page - Page number
+   * @param {number} queryParams.limit - Items per page
+   * @param {string} queryParams.landlordId - Landlord ID filter
+   * @param {string} queryParams.search - Search term
+   * @param {string} queryParams.status - Room status filter
+   * @param {string} queryParams.type - Room type filter
+   * @param {string} queryParams.sortBy - Sort field
    * @returns {Promise<Object>} Rooms data with pagination
    */
-  static async getAllRooms({ page = 1, limit = 10, filters = {} } = {}) {
+  static async getAllRooms(queryParams = {}) {
     try {
+      logger.info('RoomService.getAllRooms called with params:', queryParams);
+
+      const {
+        page = 1,
+        limit = 10,
+        landlordId,
+        search,
+        status,
+        type,
+        sortBy = 'createdAt',
+        populate: _populate, // Extract populate parameter to avoid it being used as filter
+        _ts: _cacheBust, // Remove cache-busting parameter
+        ...otherFilters
+      } = queryParams;
+
       const skip = (page - 1) * limit;
+
+      logger.info('Pagination params:', {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        skip,
+        landlordId,
+      });
+
+      // Build filter object
+      const filters = { ...otherFilters };
+
+      // Filter by landlord through building
+      if (landlordId) {
+        // Ensure landlordId is a string, not an object
+        const landlordIdStr = typeof landlordId === 'string' ? landlordId : landlordId.toString();
+        const buildings = await Building.find({ hostId: landlordIdStr }).select('_id');
+
+        if (buildings.length === 0) {
+          logger.warn('No buildings found for landlordId:', landlordIdStr);
+          return {
+            success: true,
+            message: 'No rooms found for this landlord',
+            data: {
+              rooms: [],
+              pagination: {
+                total: 0,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                pages: 0,
+              },
+            },
+          };
+        }
+
+        const buildingIds = buildings.map((b) => b._id);
+        filters.buildingId = { $in: buildingIds };
+      }
+
+      // Filter by status
+      if (status && status !== 'all') {
+        filters.status = status;
+        logger.info('Applied status filter:', JSON.stringify(status));
+      }
+
+      // Filter by type
+      if (type && type !== 'all') {
+        filters.type = type;
+      }
+
+      // Search functionality
+      if (search) {
+        // First, find buildings that match the search term
+        const buildingMatches = await Building.find({
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { 'address.street': { $regex: search, $options: 'i' } },
+            { 'address.ward': { $regex: search, $options: 'i' } },
+            { 'address.district': { $regex: search, $options: 'i' } },
+            { 'address.city': { $regex: search, $options: 'i' } },
+          ],
+        }).select('_id');
+
+        const buildingIds = buildingMatches.map((b) => b._id);
+
+        filters.$or = [
+          { title: { $regex: search, $options: 'i' } },
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { code: { $regex: search, $options: 'i' } },
+        ];
+
+        // Add building search if any buildings match
+        if (buildingIds.length > 0) {
+          filters.$or.push({ buildingId: { $in: buildingIds } });
+        }
+      }
+
+      // Build sort object
+      let sort = {};
+      switch (sortBy) {
+        case 'name':
+        case 'title':
+          sort = { title: 1, name: 1 };
+          break;
+        case 'price':
+          sort = { 'price.rent': 1 };
+          break;
+        case 'area':
+          sort = { area: 1 };
+          break;
+        case 'roomCode':
+        case 'code':
+          sort = { code: 1 };
+          break;
+        default:
+          sort = { createdAt: -1 };
+      }
+
+      logger.info('Final filters applied:', filters);
+
       const query = Room.find(filters);
+
+      // Debug: Log the actual query
+      logger.info('MongoDB query:', query.getQuery());
 
       const [rooms, total] = await Promise.all([
         query
           .skip(skip)
-          .limit(limit)
+          .limit(parseInt(limit))
+          .sort(sort)
           .populate('buildingId', 'name address hostId createdAt')
           .populate({
             path: 'buildingId',
@@ -42,17 +168,23 @@ class RoomService {
               select: 'name email phone avatar createdAt rating isVerified',
             },
           })
+          .populate('currentTenant', 'name email phone avatar idCard occupation')
           .lean(),
         Room.countDocuments(filters),
       ]);
 
+      logger.info(`Found rooms: ${rooms.length}, Total: ${total}`);
+
       return {
-        rooms,
-        pagination: {
-          total,
-          page,
-          limit,
-          pages: Math.ceil(total / limit),
+        success: true,
+        data: {
+          rooms,
+          pagination: {
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            pages: Math.ceil(total / limit),
+          },
         },
       };
     } catch (error) {
@@ -91,6 +223,7 @@ class RoomService {
             select: 'name email phone avatar createdAt rating isVerified',
           },
         })
+        .populate('currentTenant', 'name email phone avatar idCard occupation')
         .lean();
       logger.info('RoomService: Room query result', {
         roomId,
@@ -130,18 +263,102 @@ class RoomService {
         throw new ValidationError('Room data is required');
       }
 
-      //Validate ObjectId format
-      if (!mongoose.Types.ObjectId.isValid(roomData.buildingId)) {
-        logger.error('RoomService: Invalid building ID format', { roomData });
-        throw new ValidationError('Invalid building ID format');
+      // Handle buildingId - if not provided, find first building of landlord
+      if (!roomData.buildingId && roomData.landlordId) {
+        logger.info('RoomService: No buildingId provided, finding building for landlordId', {
+          landlordId: roomData.landlordId,
+        });
+
+        if (!mongoose.Types.ObjectId.isValid(roomData.landlordId)) {
+          logger.error('RoomService: Invalid landlord ID format', {
+            landlordId: roomData.landlordId,
+          });
+          throw new ValidationError('Invalid landlord ID format');
+        }
+
+        const building = await Building.findOne({ hostId: roomData.landlordId });
+        if (!building) {
+          logger.error('RoomService: No building found for landlord', {
+            landlordId: roomData.landlordId,
+          });
+          throw new ValidationError(
+            'No building found for this landlord. Please create a building first.'
+          );
+        }
+
+        roomData.buildingId = building._id;
+        logger.info('RoomService: Found building for landlord', {
+          buildingId: building._id,
+          buildingName: building.name,
+        });
       }
 
+      //Validate ObjectId format for buildingId
+      if (!roomData.buildingId || !mongoose.Types.ObjectId.isValid(roomData.buildingId)) {
+        logger.error('RoomService: Invalid or missing building ID', {
+          buildingId: roomData.buildingId,
+        });
+        throw new ValidationError('Valid building ID is required');
+      }
+
+      // Parse JSON strings to objects if needed
+      if (roomData.price && typeof roomData.price === 'string') {
+        try {
+          roomData.price = JSON.parse(roomData.price);
+        } catch (error) {
+          logger.error('RoomService: Failed to parse price JSON', {
+            price: roomData.price,
+            error: error.message,
+          });
+          throw new ValidationError('Invalid price format');
+        }
+      }
+
+      if (roomData.features && typeof roomData.features === 'string') {
+        try {
+          roomData.features = JSON.parse(roomData.features);
+        } catch (error) {
+          logger.error('RoomService: Failed to parse features JSON', {
+            features: roomData.features,
+            error: error.message,
+          });
+          throw new ValidationError('Invalid features format');
+        }
+      }
+
+      if (roomData.amenities && typeof roomData.amenities === 'string') {
+        try {
+          roomData.amenities = JSON.parse(roomData.amenities);
+        } catch (error) {
+          logger.error('RoomService: Failed to parse amenities JSON', {
+            amenities: roomData.amenities,
+            error: error.message,
+          });
+          throw new ValidationError('Invalid amenities format');
+        }
+      }
+
+      // Remove landlordId from roomData as it's not part of Room schema
+      const { landlordId: _landlordId, ...roomDataToSave } = roomData;
+
       //Create room
-      const newRoom = new Room(roomData);
+      const newRoom = new Room(roomDataToSave);
       await newRoom.save();
       logger.info('RoomService: Room created successfully', { roomId: newRoom._id });
 
-      return newRoom.toObject();
+      // Populate building data before returning
+      const populatedRoom = await Room.findById(newRoom._id)
+        .populate('buildingId', 'name address hostId createdAt')
+        .populate({
+          path: 'buildingId',
+          populate: {
+            path: 'hostId',
+            select: 'name email phone avatar createdAt rating isVerified',
+          },
+        })
+        .lean();
+
+      return populatedRoom;
     } catch (error) {
       logger.error('Error creating room:', {
         error: error.message,
@@ -181,6 +398,98 @@ class RoomService {
         throw new ValidationError('Update data is required');
       }
 
+      // Parse JSON strings to objects if needed
+      if (updateData.price && typeof updateData.price === 'string') {
+        try {
+          updateData.price = JSON.parse(updateData.price);
+        } catch (error) {
+          logger.error('RoomService: Failed to parse price JSON', {
+            price: updateData.price,
+            error: error.message,
+          });
+          throw new ValidationError('Invalid price format');
+        }
+      }
+
+      if (updateData.features && typeof updateData.features === 'string') {
+        try {
+          updateData.features = JSON.parse(updateData.features);
+        } catch (error) {
+          logger.error('RoomService: Failed to parse features JSON', {
+            features: updateData.features,
+            error: error.message,
+          });
+          throw new ValidationError('Invalid features format');
+        }
+      }
+
+      if (updateData.amenities) {
+        try {
+          // Parse amenities if it's a string
+          let amenitiesArray = updateData.amenities;
+          if (typeof updateData.amenities === 'string') {
+            amenitiesArray = JSON.parse(updateData.amenities);
+          }
+
+          // Convert amenities array to utilities array
+          updateData.utilities = amenitiesArray.map((amenity) => ({
+            name: amenity,
+            description: '',
+            isAvailable: true,
+          }));
+
+          // Remove amenities field as it's not part of Room schema
+          delete updateData.amenities;
+
+          logger.info('RoomService: Converted amenities to utilities', {
+            amenities: amenitiesArray,
+            utilities: updateData.utilities,
+          });
+        } catch (error) {
+          logger.error('RoomService: Failed to parse amenities JSON', {
+            amenities: updateData.amenities,
+            error: error.message,
+          });
+          throw new ValidationError('Invalid amenities format');
+        }
+      }
+
+      // Handle image updates
+      if (updateData.newImages || updateData.existingImages) {
+        // Get current room to access existing images
+        const currentRoom = await Room.findById(roomId);
+        if (!currentRoom) {
+          throw new NotFoundError(`Room with id ${roomId} not found`);
+        }
+
+        // Parse existingImages if it's a string
+        let existingToKeep = [];
+        if (updateData.existingImages) {
+          try {
+            existingToKeep =
+              typeof updateData.existingImages === 'string'
+                ? JSON.parse(updateData.existingImages)
+                : updateData.existingImages;
+          } catch (error) {
+            logger.error('Failed to parse existingImages:', error);
+          }
+        }
+
+        // Process image updates
+        const finalImages = await ImageService.processImageUpdate(
+          currentRoom.images || [],
+          updateData.newImages || [],
+          existingToKeep
+        );
+
+        // Update images in updateData
+        updateData.images = finalImages;
+
+        // Remove temporary fields
+        delete updateData.newImages;
+        delete updateData.existingImages;
+      }
+
       //Update room
       const updatedRoom = await Room.findByIdAndUpdate(roomId, updateData, { new: true });
 
@@ -198,6 +507,59 @@ class RoomService {
         stack: error.stack,
         roomId,
         updateData,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete specific image from room
+   * @param {string} roomId - Room ID
+   * @param {string} imageId - Image public_id to delete
+   * @returns {Promise<Object>} Updated room
+   */
+  static async deleteRoomImage(roomId, imageId) {
+    try {
+      logger.info('RoomService: Deleting room image', { roomId, imageId });
+
+      // Validate room ID
+      if (!mongoose.Types.ObjectId.isValid(roomId)) {
+        throw new ValidationError('Invalid room ID format');
+      }
+
+      // Get current room
+      const room = await Room.findById(roomId);
+      if (!room) {
+        throw new NotFoundError(`Room with id ${roomId} not found`);
+      }
+
+      // Find image to delete
+      const imageToDelete = room.images.find((img) => img.public_id === imageId);
+      if (!imageToDelete) {
+        throw new NotFoundError(`Image with public_id ${imageId} not found in room`);
+      }
+
+      // Delete from Cloudinary
+      await ImageService.replaceImages([imageToDelete], []);
+
+      // Remove image from room
+      const updatedImages = room.images.filter((img) => img.public_id !== imageId);
+
+      // Update room
+      const updatedRoom = await Room.findByIdAndUpdate(
+        roomId,
+        { images: updatedImages },
+        { new: true }
+      );
+
+      logger.info('RoomService: Room image deleted successfully', { roomId, imageId });
+      return updatedRoom.toObject();
+    } catch (error) {
+      logger.error('Error deleting room image:', {
+        error: error.message,
+        stack: error.stack,
+        roomId,
+        imageId,
       });
       throw error;
     }
@@ -292,22 +654,54 @@ class RoomService {
    * @param {Object} options - Pagination options
    * @returns {Promise<Object>} Search results with pagination
    */
-  static async searchRooms(keyword, { page = 1, limit = 10 } = {}) {
+  static async searchRooms(keyword, { page = 1, limit = 10, landlordId } = {}) {
     try {
       const skip = (page - 1) * limit;
 
-      // Create search query
-      const searchQuery = {
+      // First, find buildings that match the search term
+      const buildingMatches = await Building.find({
         $or: [
           { name: { $regex: keyword, $options: 'i' } },
+          { 'address.street': { $regex: keyword, $options: 'i' } },
+          { 'address.ward': { $regex: keyword, $options: 'i' } },
+          { 'address.district': { $regex: keyword, $options: 'i' } },
+          { 'address.city': { $regex: keyword, $options: 'i' } },
+        ],
+      }).select('_id');
+
+      const buildingIds = buildingMatches.map((b) => b._id);
+
+      // Create search query for room fields
+      const roomSearchQuery = {
+        $or: [
+          { name: { $regex: keyword, $options: 'i' } },
+          { title: { $regex: keyword, $options: 'i' } },
+          { description: { $regex: keyword, $options: 'i' } },
+          { code: { $regex: keyword, $options: 'i' } },
           { 'utilities.name': { $regex: keyword, $options: 'i' } },
           { status: { $regex: keyword, $options: 'i' } },
         ],
       };
 
+      // Add building search if any buildings match
+      if (buildingIds.length > 0) {
+        roomSearchQuery.$or.push({ buildingId: { $in: buildingIds } });
+      }
+
+      const ownerFilter = {};
+      if (landlordId) {
+        const buildings = await Building.find({ hostId: landlordId }).select('_id');
+        const buildingIds = buildings.map((b) => b._id);
+        ownerFilter.buildingId = { $in: buildingIds };
+      }
+
       const [rooms, total] = await Promise.all([
-        Room.find(searchQuery).skip(skip).limit(limit).lean(),
-        Room.countDocuments(searchQuery),
+        Room.find({ ...roomSearchQuery, ...ownerFilter })
+          .skip(skip)
+          .limit(limit)
+          .populate('buildingId', 'name address hostId createdAt')
+          .lean(),
+        Room.countDocuments({ ...roomSearchQuery, ...ownerFilter }),
       ]);
 
       return {
@@ -373,6 +767,48 @@ class RoomService {
       };
     } catch (error) {
       logger.error('Error filtering rooms:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get contract information for a room
+   * @param {string} roomId - Room ID
+   * @returns {Promise<Object>} Contract data with tenant information
+   */
+  static async getRoomContractInfo(roomId) {
+    try {
+      logger.info('RoomService: Getting contract info for room', { roomId });
+
+      if (!roomId || !mongoose.Types.ObjectId.isValid(roomId)) {
+        throw new ValidationError('Invalid room ID format');
+      }
+
+      // Find active contract for this room
+      const contract = await Contract.findOne({
+        roomId,
+        status: { $in: ['active', 'pending'] },
+      })
+        .populate('renterId', 'name email phone avatar idCard occupation')
+        .populate('roomId', 'name roomCode price')
+        .populate('buildingId', 'name address')
+        .lean();
+
+      if (!contract) {
+        return {
+          success: true,
+          data: null,
+          message: 'No active contract found for this room',
+        };
+      }
+
+      return {
+        success: true,
+        data: contract,
+        message: 'Contract information retrieved successfully',
+      };
+    } catch (error) {
+      logger.error('Error getting room contract info:', error);
       throw error;
     }
   }

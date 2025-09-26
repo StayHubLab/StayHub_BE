@@ -102,10 +102,47 @@ class ContractService {
       if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
         throw new ValidationError('Invalid user ID format');
       }
-      const contracts = await Contract.find({ renterId: userId }).lean();
+      const contracts = await Contract.find({ renterId: userId })
+        .populate({
+          path: 'roomId',
+          select: 'name buildingId price',
+          populate: {
+            path: 'buildingId',
+            select: 'name address hostId',
+            populate: { path: 'hostId', select: 'name email phone' },
+          },
+        })
+        .lean();
       return contracts;
     } catch (error) {
       logger.error('ContractService: Error getting contracts by user id:', error);
+      throw error;
+    }
+  }
+
+  static async getContractsByHostId(hostId) {
+    try {
+      if (!hostId || !mongoose.Types.ObjectId.isValid(hostId)) {
+        throw new ValidationError('Invalid host ID format');
+      }
+      const contracts = await Contract.find({ hostId })
+        .populate({
+          path: 'roomId',
+          select: 'name code roomCode title price buildingId',
+          populate: {
+            path: 'buildingId',
+            select: 'name address hostId',
+            populate: { path: 'hostId', select: 'name email phone' },
+          },
+        })
+        .populate({
+          path: 'renterId',
+          select: 'name email phone avatar idCard occupation',
+        })
+        .lean();
+      return contracts;
+    } catch (error) {
+      logger.error('ContractService: Error getting contracts by host id:', error);
       throw error;
     }
   }

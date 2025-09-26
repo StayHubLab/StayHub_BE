@@ -49,9 +49,29 @@ const BillSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    note: {
+      type: String,
+      maxLength: 2000,
+    },
+    type: {
+      type: String,
+      enum: ['monthly', 'one-time', 'deposit', 'refund'],
+      default: 'monthly',
+      index: true,
+    },
+    month: {
+      type: Number,
+      min: 1,
+      max: 12,
+    },
+    year: {
+      type: Number,
+      min: 2020,
+      max: 3000,
+    },
     status: {
       type: String,
-      enum: ['pending', 'paid', 'overdue'],
+      enum: ['pending', 'paid', 'overdue', 'failed'],
       default: 'pending',
       index: true,
     },

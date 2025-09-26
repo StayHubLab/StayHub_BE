@@ -58,7 +58,7 @@ const emailTemplates = {
   },
 
   /**
-   * Verification email template
+   * Registration confirmation email template
    */
   REGISTRATION: {
     subject: 'Registration Confirmation - StayHub',
@@ -137,33 +137,6 @@ const emailTemplates = {
   },
 
   /**
-   * Password reset email template
-   */
-  PASSWORD_RESET: {
-    subject: 'Password Reset Request - StayHub',
-    getContent: ({ resetLink, name }) => `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #2c3e50; margin: 0;">Password Reset Request</h1>
-        </div>
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
-          <p style="color: #34495e; margin: 0;">Dear ${name},</p>
-          <p style="color: #34495e; margin: 15px 0 0 0;">We received a request to reset your password.</p>
-          <p style="color: #34495e; margin: 15px 0 0 0;">Click the button below to reset your password:</p>
-        </div>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${resetLink}" style="background-color: #3498db; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
-        </div>
-        <div style="text-align: center; color: #7f8c8d; font-size: 14px;">
-          <p style="margin: 0;">If you didn't request this, please ignore this email.</p>
-          <p style="margin: 10px 0 0 0;">This link will expire in 1 hour.</p>
-          <p style="margin: 10px 0 0 0;">Best regards,<br>StayHub Team</p>
-        </div>
-      </div>
-    `,
-  },
-
-  /**
    * Viewing appointment confirmation email template (Polished)
    */
   VIEWING_CONFIRMATION: {
@@ -184,7 +157,6 @@ const emailTemplates = {
 
       const formatPrice = (price) => {
         try {
-          // Handle case where price is already a number
           const numPrice =
             typeof price === 'number'
               ? price
@@ -634,6 +606,209 @@ const emailTemplates = {
         </div>
       </div>
     `,
+  },
+
+  /**
+   * Bill notification email template - For renter
+   */
+  BILL_NOTIFICATION: {
+    subject: 'Hóa đơn mới - StayHub',
+    getContent: (data) => {
+      const formatPrice = (price) => {
+        try {
+          const numPrice = typeof price === 'number' ? price : parseFloat(price) || 0;
+          return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND',
+          }).format(numPrice);
+        } catch {
+          return typeof price === 'number'
+            ? `${price?.toLocaleString?.('vi-VN') || price} ₫`
+            : '0 ₫';
+        }
+      };
+
+      const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('vi-VN', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      };
+
+      const SITE = process.env.FRONTEND_URL || 'https://stayhub.com';
+      const LOGO =
+        'https://cdn-img.upanhlaylink.com/img/image_202506094d11076c38a6a6044e43c4b7acd4d0ad.jpg';
+
+      return `
+        <!-- Preheader -->
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+          Hóa đơn mới từ chủ trọ. Xem chi tiết số tiền và hạn thanh toán trong email này.
+        </div>
+
+        <div style="background-color:#f3f5f9; padding:24px;">
+          <div style="font-family: -apple-system, Segoe UI, Roboto, Arial, 'Noto Sans', Helvetica, sans-serif; max-width:680px; margin:0 auto;">
+
+            <!-- Card wrapper -->
+            <div style="background-color:#ffffff; border:1px solid #e6ebf1; border-radius:14px; overflow:hidden; box-shadow:0 6px 20px rgba(16,24,40,.06);">
+
+              <!-- Header -->
+              <div style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%); padding:32px 28px; text-align:center; position:relative;">
+                <a href="${SITE}" style="text-decoration:none; display:inline-block;">
+                  <img src="${LOGO}" width="72" height="72" alt="StayHub" style="border-radius:14px; display:block; margin:0 auto 14px auto; outline:none; border:none;">
+                </a>
+                <h1 style="margin:0; color:#ffffff; font-size:26px; line-height:1.3; font-weight:700;">
+                  💰 Hóa đơn mới
+                </h1>
+                <p style="margin:8px 0 0 0; color:rgba(255,255,255,.9); font-size:15px; line-height:1.6;">
+                  Chủ trọ đã tạo hóa đơn cho bạn
+                </p>
+              </div>
+
+              <!-- Body -->
+              <div style="padding:36px 28px 8px 28px;">
+                <!-- Greeting -->
+                <div style="margin:0 0 22px 0;">
+                  <h2 style="margin:0 0 8px 0; color:#1f2937; font-size:20px; line-height:1.5; font-weight:700;">Xin chào ${
+                    data.renterName
+                  } 👋</h2>
+                  <p style="margin:0; color:#4b5563; font-size:15px; line-height:1.75;">
+                    Chủ trọ đã tạo hóa đơn mới cho bạn. Dưới đây là thông tin chi tiết:
+                  </p>
+                </div>
+
+                <!-- Bill Details -->
+                <div style="background-color:#f7fafc; border:1px solid #e5e7eb; border-radius:12px; padding:20px; margin-bottom:22px;">
+                  <h3 style="margin:0 0 14px 0; color:#f59e0b; font-size:16px; font-weight:700; display:flex; align-items:center;">
+                    <span style="margin-right:8px;">📄</span> Thông tin hóa đơn
+                  </h3>
+
+                  <div style="display:block;">
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                      <div style="min-width:130px; color:#6b7280; font-weight:600;">Mã hóa đơn:</div>
+                      <div style="color:#111827; font-weight:600;">#${data.billId || 'N/A'}</div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                      <div style="min-width:130px; color:#6b7280; font-weight:600;">Tháng/Năm:</div>
+                      <div style="color:#111827; font-weight:600;">${data.month}/${data.year}</div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                      <div style="min-width:130px; color:#6b7280; font-weight:600;">Loại hóa đơn:</div>
+                      <div style="color:#111827; font-weight:600;">${
+                        data.type === 'monthly'
+                          ? 'Hàng tháng'
+                          : data.type === 'deposit'
+                          ? 'Đặt cọc'
+                          : 'Một lần'
+                      }</div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                      <div style="min-width:130px; color:#6b7280; font-weight:600;">Trạng thái:</div>
+                      <div style="background-color:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; display:inline-block;">
+                        ${
+                          data.status === 'pending'
+                            ? '⏳ CHƯA THANH TOÁN'
+                            : data.status === 'paid'
+                            ? '✅ ĐÃ THANH TOÁN'
+                            : '❌ QUÁ HẠN'
+                        }
+                      </div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                      <div style="min-width:130px; color:#6b7280; font-weight:600;">Hạn thanh toán:</div>
+                      <div style="color:#111827; font-weight:600;">${
+                        data.dueDate ? formatDate(data.dueDate) : 'Chưa xác định'
+                      }</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Room Info -->
+                <div style="background-color:#f7fafc; border:1px solid #e5e7eb; border-radius:12px; padding:20px; margin-bottom:22px;">
+                  <h3 style="margin:0 0 14px 0; color:#4f46e5; font-size:16px; font-weight:700; display:flex; align-items:center;">
+                    <span style="margin-right:8px;">🏠</span> Thông tin phòng trọ
+                  </h3>
+                  <div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                      <div style="min-width:130px; color:#6b7280; font-weight:600;">Tên phòng:</div>
+                      <div style="color:#111827; font-weight:700;">${data.roomName || 'N/A'}</div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
+                      <div style="min-width:130px; color:#6b7280; font-weight:600;">Địa chỉ:</div>
+                      <div style="color:#111827;">${data.roomAddress || 'N/A'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Amount Breakdown -->
+                <div style="background-color:#f0f9ff; border:1px solid #0ea5e9; border-radius:12px; padding:20px; margin-bottom:22px;">
+                  <h3 style="margin:0 0 14px 0; color:#0ea5e9; font-size:16px; font-weight:700; display:flex; align-items:center;">
+                    <span style="margin-right:8px;">💸</span> Chi tiết thanh toán
+                  </h3>
+                  <div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #bae6fd;">
+                      <div style="min-width:130px; color:#0369a1; font-weight:700;">Tiền thuê phòng:</div>
+                      <div style="color:#0f172a; font-weight:700;">${formatPrice(
+                        data.amount?.rent || 0
+                      )}</div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #bae6fd;">
+                      <div style="min-width:130px; color:#0369a1; font-weight:700;">Tiền điện:</div>
+                      <div style="color:#0f172a; font-weight:700;">${formatPrice(
+                        data.amount?.electricity || 0
+                      )}</div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #bae6fd;">
+                      <div style="min-width:130px; color:#0369a1; font-weight:700;">Tiền nước:</div>
+                      <div style="color:#0f172a; font-weight:700;">${formatPrice(
+                        data.amount?.water || 0
+                      )}</div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:1px solid #bae6fd;">
+                      <div style="min-width:130px; color:#0369a1; font-weight:700;">Phí dịch vụ:</div>
+                      <div style="color:#0f172a; font-weight:700;">${formatPrice(
+                        data.amount?.service || 0
+                      )}</div>
+                    </div>
+                    <div style="display:flex; padding:10px 0; border-top:2px solid #0ea5e9; background-color:#e0f2fe;">
+                      <div style="min-width:130px; color:#0c4a6e; font-weight:800; font-size:16px;">TỔNG CỘNG:</div>
+                      <div style="color:#0c4a                  <ul style="margin:0; padding-left:18px; color:#7c2d12; line-height:1.8; font-size:14px;">
+                    <li>Vui lòng thanh toán trước hạn để tránh bị phạt hoặc gián đoạn dịch vụ</li>
+                    <li>Giữ biên lai thanh toán để đối chiếu nếu cần thiết</li>
+                    <li>Nếu có bất kỳ vấn đề nào, liên hệ với chủ trọ hoặc bộ phận hỗ trợ StayHub</li>
+                  </ul>
+                </div>
+
+                <!-- CTA Buttons -->
+                <div style="text-align:center; margin:28px 0 10px 0;">
+                  <a href="${SITE}/bills/${
+        data.billId
+      }" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#ffffff; padding:14px 22px; text-decoration:none; border-radius:10px; display:inline-block; font-weight:800; box-shadow:0 6px 16px rgba(217,119,6,.25); margin:0 6px;">
+                    💳 Thanh toán ngay
+                  </a>
+                  <a href="${SITE}/support" style="background:linear-gradient(135deg,#4f46e5,#6366f1); color:#ffffff; padding:14px 22px; text-decoration:none; border-radius:10px; display:inline-block; font-weight:800; box-shadow:0 6px 16px rgba(99,102,241,.25); margin:0 6px;">
+                    📞 Liên hệ hỗ trợ
+                  </a>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div style="background-color:#f8fafc; padding:24px 28px; border-top:1px solid #e6ebf1; text-align:center;">
+                <p style="margin:0 0 12px 0; color:#374151; font-size:13px;">Cảm ơn bạn đã sử dụng dịch vụ của StayHub!</p>
+                <div style="margin-bottom:14px;">
+                  <a href="mailto:support@stayhub.com" style="color:#4f46e5; text-decoration:none; margin:0 10px;">📧 support@stayhub.com</a>
+                  <a href="tel:1900-1234" style="color:#4f46e5; text-decoration:none; margin:0 10px;">📞 1900-1234</a>
+                </div>
+                <p style="margin:0; color:#9ca3af; font-size:12px;">© 2025 StayHub. Tất cả quyền được bảo lưu.</p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      `;
+    },
   },
 };
 

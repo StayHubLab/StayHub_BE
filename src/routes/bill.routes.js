@@ -15,6 +15,8 @@ const {
   deleteBill,
   getBillsByContractId,
   markBillPaid,
+  getBillsByRenterId,
+  getBillsByHostId,
 } = require('../controllers/bill.controller');
 const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 
@@ -22,6 +24,8 @@ const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 router.get('/', auth, roleMiddleware('admin'), getAllBills);
 router.get('/:id', auth, getBillById);
 router.get('/contract/:contractId', auth, getBillsByContractId);
+router.get('/renter/:renterId', auth, getBillsByRenterId);
+router.get('/host/:hostId', auth, getBillsByHostId);
 router.post('/', auth, roleMiddleware('landlord', 'admin'), createBill);
 router.put('/:id', auth, roleMiddleware('landlord', 'admin'), updateBill);
 router.put('/:id/pay', auth, markBillPaid);

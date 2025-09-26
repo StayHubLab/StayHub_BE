@@ -104,3 +104,37 @@ exports.markBillPaid = async (req, res) => {
       .json({ success: false, message: 'Error marking bill as paid', error: error.message });
   }
 };
+
+// GET /api/bills/renter/:renterId
+exports.getBillsByRenterId = async (req, res) => {
+  try {
+    const { renterId } = req.params;
+    const { status } = req.query;
+    const bills = await BillService.getBillsByRenterId(renterId, { status });
+    res.status(200).json({ success: true, message: 'Bills retrieved successfully', data: bills });
+  } catch (error) {
+    logger.error('Error getting bills by renter ID:', error);
+    res
+      .status(500)
+      .json({ success: false, message: 'Error getting bills by renter ID', error: error.message });
+  }
+};
+
+// GET /api/bills/host/:hostId
+exports.getBillsByHostId = async (req, res) => {
+  try {
+    const { hostId } = req.params;
+    if (!hostId || !mongoose.Types.ObjectId.isValid(hostId)) {
+      return res.status(400).json({ success: false, message: 'Invalid host ID format' });
+    }
+    const bills = await BillService.getBillsByHostId(hostId);
+    res.status(200).json({ success: true, message: 'Bills retrieved successfully', data: bills });
+  } catch (error) {
+    logger.error('Error getting bills by host ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting bills by host ID',
+      error: error.message,
+    });
+  }
+};

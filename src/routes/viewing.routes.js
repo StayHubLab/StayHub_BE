@@ -7,7 +7,7 @@
 
 const express = require('express');
 const ViewingController = require('../controllers/viewing.controller');
-const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
+// const { auth, roleMiddleware } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 

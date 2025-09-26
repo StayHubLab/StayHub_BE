@@ -7,6 +7,10 @@
 
 const mongoose = require('mongoose');
 const Bill = require('../models/bill.model');
+const Contract = require('../models/contract.model');
+const Room = require('../models/room.model');
+const User = require('../models/user.model');
+const EmailService = require('./email.service');
 const { ValidationError, NotFoundError } = require('../utils/errors');
 const logger = require('../utils/logger');
 
@@ -46,6 +50,18 @@ class BillService {
     try {
       if (!billData) {
         throw new ValidationError('Bill data is required');
+      }
+      // Prevent duplicate deposit bills for the same contract & renter while not paid
+      if (billData.type === 'deposit' && billData.contractId && billData.renterId) {
+        const existing = await Bill.findOne({
+          contractId: billData.contractId,
+          renterId: billData.renterId,
+          type: 'deposit',
+          status: { $ne: 'paid' },
+        }).lean();
+        if (existing) {
+          return existing; // return existing bill to avoid duplicates
+        }
       }
       // Optionally compute totalAmount if not provided
       if (billData.totalAmount == null) {
@@ -116,6 +132,27 @@ class BillService {
     }
   }
 
+  static async getBillsByRenterId(renterId, { status } = {}) {
+    try {
+      if (!renterId || !mongoose.Types.ObjectId.isValid(renterId)) {
+        throw new ValidationError('Invalid renter ID format');
+      }
+      const filter = { renterId };
+      if (status) filter.status = status;
+      const bills = await Bill.find(filter)
+        .populate({
+          path: 'contractId',
+          select: 'code roomId',
+          populate: { path: 'roomId', select: 'name' },
+        })
+        .lean();
+      return bills;
+    } catch (error) {
+      logger.error('BillService: Error getting bills by renter id:', error);
+      throw error;
+    }
+  }
+
   static async markBillPaid(billId, { paymentMethod, paidAt } = {}) {
     try {
       if (!billId || !mongoose.Types.ObjectId.isValid(billId)) {
@@ -130,12 +167,93 @@ class BillService {
       if (!updated) {
         throw new NotFoundError(`Bill with id ${billId} not found`);
       }
+
+      // If this is a deposit bill, activate the contract and mark room as rented
+      if (updated.type === 'deposit' && updated.contractId) {
+        try {
+          const contract = await Contract.findById(updated.contractId);
+          if (contract) {
+            // Activate contract if still pending
+            if (contract.status === 'pending') {
+              contract.status = 'active';
+              await contract.save();
+            }
+            // Update room status and availability
+            if (contract.roomId && contract.renterId) {
+              await Room.findByIdAndUpdate(
+                contract.roomId,
+                {
+                  $set: {
+                    status: 'rented',
+                    isAvailable: false,
+                    currentTenant: contract.renterId,
+                  },
+                },
+                { new: true }
+              );
+            }
+          }
+        } catch (hookErr) {
+          logger.error('BillService: Post-payment hook failed:', hookErr);
+        }
+      }
       return updated.toObject();
     } catch (error) {
       logger.error('BillService: Error marking bill as paid:', error);
       throw error;
     }
   }
+
+  static async getBillsByHostId(hostId) {
+    try {
+      if (!hostId || !mongoose.Types.ObjectId.isValid(hostId)) {
+        throw new ValidationError('Invalid host ID format');
+      }
+
+      // Find all contracts for this host, then get bills for those contracts
+      const contracts = await Contract.find({ hostId }).select('_id');
+      const contractIds = contracts.map((c) => c._id);
+
+      if (contractIds.length === 0) {
+        return [];
+      }
+
+      const bills = await Bill.find({ contractId: { $in: contractIds } })
+        .populate('contractId', 'code roomId renterId')
+        .populate({
+          path: 'contractId',
+          populate: {
+            path: 'roomId',
+            select: 'name code roomCode price',
+          },
+        })
+        .populate({
+          path: 'contractId',
+          populate: {
+            path: 'renterId',
+            select: 'name email phone',
+          },
+        })
+        .populate('renterId', 'name email phone')
+        .sort({ createdAt: -1 })
+        .lean();
+
+      return bills;
+    } catch (error) {
+      logger.error('BillService: Error getting bills by host ID:', error);
+      throw error;
+    }
+  }
 }
+
+module.exports = BillService;
+
+module.exports = BillService;
+
+module.exports = BillService;
+
+module.exports = BillService;
+
+module.exports = BillService;
 
 module.exports = BillService;

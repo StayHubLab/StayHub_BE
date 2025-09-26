@@ -7,7 +7,7 @@
 
 const Viewing = require('../models/viewing.model');
 const Room = require('../models/room.model');
-const Building = require('../models/building.model');
+// const Building = require('../models/building.model');
 const User = require('../models/user.model');
 const EmailService = require('./email.service');
 const logger = require('../utils/logger');
