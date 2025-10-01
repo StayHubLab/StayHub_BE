@@ -215,9 +215,35 @@ exports.deleteRoom = async (req, res) => {
       message: 'Room deleted successfully',
       data: deletedRoom,
     });
-    logger.info('Room deleted successfully');
+    logger.info('Room deleted successfully', { roomId });
   } catch (error) {
     logger.error('Error deleting room:', error);
+    
+    // Handle specific validation errors with appropriate status codes
+    if (error.message.includes('Cannot delete room')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        error: 'Room has active tenant or contracts',
+      });
+    }
+    
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+        error: 'Room not found',
+      });
+    }
+    
+    if (error.message.includes('Invalid room ID')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        error: 'Invalid room ID format',
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error deleting room',

@@ -141,7 +141,7 @@ class ViewingService {
           // Common data
           roomId: populatedViewing.roomId._id,
           roomName: populatedViewing.roomId.name || 'Phòng trọ',
-          roomPrice: populatedViewing.roomId.price?.rent || 0,
+          roomPrice: populatedViewing.roomId.price || 0,
           roomAddress:
             typeof populatedViewing.buildingId.address === 'string'
               ? populatedViewing.buildingId.address

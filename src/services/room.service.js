@@ -9,6 +9,7 @@ const Room = require('../models/room.model');
 const Building = require('../models/building.model');
 // const User = require('../models/user.model'); // Not used in this service
 const Contract = require('../models/contract.model');
+const Booking = require('../models/booking.model');
 const ImageService = require('./image.service');
 const logger = require('../utils/logger');
 const { NotFoundError, ValidationError } = require('../utils/errors');
@@ -582,6 +583,46 @@ class RoomService {
         throw new NotFoundError(`Room with id ${roomId} not found`);
       }
 
+      // Check if room has current tenant or is rented
+      if (room.currentTenant || room.status === 'rented') {
+        logger.error('RoomService: Cannot delete room with active tenant', {
+          roomId,
+          currentTenant: room.currentTenant,
+          status: room.status,
+        });
+        throw new ValidationError('Cannot delete room that has an active tenant. Please terminate the rental contract first.');
+      }
+
+      // Check for active contracts
+      const activeContract = await Contract.findOne({
+        roomId: roomId,
+        status: { $in: ['active', 'pending'] },
+      });
+
+      if (activeContract) {
+        logger.error('RoomService: Cannot delete room with active contract', {
+          roomId,
+          contractId: activeContract._id,
+          contractStatus: activeContract.status,
+        });
+        throw new ValidationError('Cannot delete room that has an active or pending contract. Please terminate the contract first.');
+      }
+
+      // Check for active bookings
+      const activeBooking = await Booking.findOne({
+        roomId: roomId,
+        status: { $in: ['confirmed', 'pending', 'checked_in'] },
+      });
+
+      if (activeBooking) {
+        logger.error('RoomService: Cannot delete room with active booking', {
+          roomId,
+          bookingId: activeBooking._id,
+          bookingStatus: activeBooking.status,
+        });
+        throw new ValidationError('Cannot delete room that has an active booking. Please cancel or complete the booking first.');
+      }
+
       await Promise.all([
         Building.findByIdAndUpdate(room.buildingId, {
           $inc: { availableRooms: 1 },
@@ -589,6 +630,7 @@ class RoomService {
         Room.findByIdAndDelete(roomId),
       ]);
 
+      logger.info('RoomService: Room deleted successfully', { roomId });
       return room.toObject();
     } catch (error) {
       logger.error('Error deleting room:', error);
