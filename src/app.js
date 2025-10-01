@@ -32,7 +32,7 @@ const billRoutes = require('./routes/bill.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const viewingRoutes = require('./routes/viewing.routes');
 const savedRoomRoutes = require('./routes/saved-room.routes');
-
+const chatRoutes = require('./routes/chat.routes');
 // Import middleware
 const { auth } = require('./middlewares/auth.middleware');
 
@@ -139,7 +139,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/payments', paymentRoutes);
-
+app.use('/api/chat', chatRoutes);
 // DEBUG: list all registered routes (temp) -----------------
 if (process.env.LIST_ROUTES === 'true') {
   const listRoutes = () => {
@@ -225,9 +225,27 @@ const startServer = async () => {
     }
     const PORT = process.env.PORT || 5000;
 
-    const server = app.listen(PORT, () => {
-      logger.info(`Server is running on port ${PORT}`);
-    });
+  // Khởi tạo HTTP server
+const server = app.listen(PORT, () => {
+  logger.info(`Server is running on port ${PORT}`);
+});
+
+// Tạo socket server gắn vào server HTTP
+const { Server } = require("socket.io");
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CORS_ORIGIN || "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+// 👇 Gắn io vào app để controller có thể lấy bằng req.app.get('io')
+app.set("io", io);
+
+// Import file quản lý socket
+const initSocket = require("./socket/socket");
+initSocket(io);
+
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
