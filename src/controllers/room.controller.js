@@ -215,6 +215,7 @@ exports.deleteRoom = async (req, res) => {
       message: 'Room deleted successfully',
       data: deletedRoom,
     });
+<<<<<<< HEAD
     logger.info('Room deleted successfully', { roomId });
   } catch (error) {
     logger.error('Error deleting room:', error);
@@ -244,6 +245,11 @@ exports.deleteRoom = async (req, res) => {
       });
     }
     
+=======
+    logger.info('Room deleted successfully');
+  } catch (error) {
+    logger.error('Error deleting room:', error);
+>>>>>>> 1b7272e6f01d0861a0a926d113736381c26a7d91
     res.status(500).json({
       success: false,
       message: 'Error deleting room',
