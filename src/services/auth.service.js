@@ -168,10 +168,7 @@ class AuthService {
         'preferredPriceRange',
         'avatar',
         'verificationDocument',
-<<<<<<< HEAD
-=======
         'bankInfo',     
->>>>>>> 1b7272e6f01d0861a0a926d113736381c26a7d91
       ];
 
       Object.keys(updateData).forEach((key) => {

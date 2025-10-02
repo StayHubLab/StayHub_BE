@@ -8,7 +8,7 @@
 const Conversation = require('../models/conversation.model');
 const Message = require('../models/message.model');
 const User = require('../models/user.model');
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 // Tạo hoặc lấy conversation giữa 2 user
 async function getOrCreateConversation(userId1, userId2) {
   let conversation = await Conversation.findOne({
@@ -29,10 +29,10 @@ async function getUserConversations(userId) {
     return Conversation.find({
       participants: new mongoose.Types.ObjectId(userId), // ✅ ép kiểu
     })
-      .populate("participants", "name email role")
+      .populate('participants', 'name email role')
       .populate({
-        path: "lastMessage",
-        populate: { path: "sender", select: "name email role" },
+        path: 'lastMessage',
+        populate: { path: 'sender', select: 'name email role' },
       })
       .sort({ updatedAt: -1 });
   }

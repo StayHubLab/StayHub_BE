@@ -9,10 +9,7 @@ const Room = require('../models/room.model');
 const Building = require('../models/building.model');
 // const User = require('../models/user.model'); // Not used in this service
 const Contract = require('../models/contract.model');
-<<<<<<< HEAD
 const Booking = require('../models/booking.model');
-=======
->>>>>>> 1b7272e6f01d0861a0a926d113736381c26a7d91
 const ImageService = require('./image.service');
 const logger = require('../utils/logger');
 const { NotFoundError, ValidationError } = require('../utils/errors');
@@ -48,8 +45,8 @@ class RoomService {
         status,
         type,
         sortBy = 'createdAt',
-        populate: _populate, // Extract populate parameter to avoid it being used as filter
-        _ts: _cacheBust, // Remove cache-busting parameter
+        populate, // Extract populate parameter to avoid it being used as filter
+        _ts, // Remove cache-busting parameter
         ...otherFilters
       } = queryParams;
 
@@ -586,7 +583,6 @@ class RoomService {
         throw new NotFoundError(`Room with id ${roomId} not found`);
       }
 
-<<<<<<< HEAD
       // Check if room has current tenant or is rented
       if (room.currentTenant || room.status === 'rented') {
         logger.error('RoomService: Cannot delete room with active tenant', {
@@ -627,8 +623,6 @@ class RoomService {
         throw new ValidationError('Cannot delete room that has an active booking. Please cancel or complete the booking first.');
       }
 
-=======
->>>>>>> 1b7272e6f01d0861a0a926d113736381c26a7d91
       await Promise.all([
         Building.findByIdAndUpdate(room.buildingId, {
           $inc: { availableRooms: 1 },
@@ -636,10 +630,7 @@ class RoomService {
         Room.findByIdAndDelete(roomId),
       ]);
 
-<<<<<<< HEAD
       logger.info('RoomService: Room deleted successfully', { roomId });
-=======
->>>>>>> 1b7272e6f01d0861a0a926d113736381c26a7d91
       return room.toObject();
     } catch (error) {
       logger.error('Error deleting room:', error);
