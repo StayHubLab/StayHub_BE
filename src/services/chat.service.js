@@ -19,8 +19,22 @@ async function getOrCreateConversation(userId1, userId2) {
     conversation = await Conversation.create({
       participants: [userId1, userId2],
     });
+    // Populate sau khi tạo
+    conversation = await conversation.populate('participants', 'name email role');
   }
 
+  return conversation;
+}
+
+// Lấy conversation by ID với validation
+async function getConversationById(conversationId) {
+  const conversation = await Conversation.findById(conversationId)
+    .populate('participants', 'name email role');
+  
+  if (!conversation) {
+    throw new Error('Conversation not found');
+  }
+  
   return conversation;
 }
 
@@ -83,4 +97,5 @@ module.exports = {
   getUserConversations,
   sendMessage,
   getMessages,
+  getConversationById,
 };

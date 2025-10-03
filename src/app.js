@@ -78,9 +78,20 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'http://localhost:5173',
+  'http://localhost:5500',   // Added this!
+  'http://127.0.0.1:5500',
+  'http://127.0.0.1:3000',
+  'http://localhost:8080',
+  process.env.CORS_ORIGIN
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: true, // Allow all origins in development
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -237,8 +248,9 @@ const server = app.listen(PORT, () => {
 const { Server } = require('socket.io');
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: true, // Allow all origins in development
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 

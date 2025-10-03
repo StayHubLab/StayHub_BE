@@ -15,7 +15,7 @@ exports.createConversation = async (req, res, next) => {
       const userId = req.user._id;
   
       if (recipientId === userId.toString()) {
-        return res.status(400).json({ success: false, message: "Can't chat with yourself" });
+        return res.status(400).json({ success: false, message: 'Can\'t chat with yourself' });
       }
   
       const conversation = await chatService.getOrCreateConversation(userId, recipientId);
@@ -38,7 +38,7 @@ exports.createConversation = async (req, res, next) => {
     }
   };
   
-  // Gửi tin nhắn
+  // Gửi tin nhắn (REST API fallback, socket là primary)
   exports.sendMessage = async (req, res, next) => {
     try {
       const { conversationId, content } = req.body;
@@ -46,13 +46,15 @@ exports.createConversation = async (req, res, next) => {
   
       const message = await chatService.sendMessage(conversationId, userId, content);
   
-      const io = req.app.get("io");
-  
-      // emit tin nhắn cho tất cả client trong room
-      io.to(conversationId.toString()).emit("newMessage", {
-        ...message,
-        conversation: conversationId, // đảm bảo có id hội thoại
-      });
+      // Chỉ emit qua socket nếu cần thiết (socket không available)
+      const io = req.app.get('io');
+      if (io) {
+        // emit tin nhắn cho tất cả client trong room
+        io.to(conversationId.toString()).emit('newMessage', {
+          ...message,
+          conversation: conversationId,
+        });
+      }
   
       res.status(201).json({ success: true, message });
     } catch (err) {
