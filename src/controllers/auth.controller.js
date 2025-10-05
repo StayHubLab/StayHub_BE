@@ -359,7 +359,7 @@ exports.resendVerificationEmail = async (req, res) => {
  * @description Change password when logged in
  * @param {Object} req.user - Authenticated user object
  * @param {Object} req.body - Password data
- * @param {string} req.body.oldPassword - Current password
+ * @param {string} req.body.currentPassword - Current password (also accepts oldPassword for backward compatibility)
  * @param {string} req.body.newPassword - New password
  * @returns {Object} Password change result
  */
@@ -369,10 +369,12 @@ exports.changePassword = async (req, res) => {
       throw { code: 'UNAUTHORIZED', message: 'User not authenticated' };
     }
 
-    const { oldPassword, newPassword } = req.body;
+    // Support both currentPassword and oldPassword for backward compatibility
+    const { currentPassword, oldPassword, newPassword } = req.body;
+    const password = currentPassword || oldPassword;
 
-    if (!oldPassword || !newPassword) {
-      throw { code: 'MISSING_FIELDS', message: 'Old password and new password are required' };
+    if (!password || !newPassword) {
+      throw { code: 'MISSING_FIELDS', message: 'Current password and new password are required' };
     }
 
     if (!validatePassword(newPassword)) {
@@ -384,7 +386,7 @@ exports.changePassword = async (req, res) => {
     }
 
     validateToken(req);
-    const result = await AuthService.changePassword(req.user._id, oldPassword, newPassword);
+    const result = await AuthService.changePassword(req.user._id, password, newPassword);
 
     // Clear cookies after password change
     res.clearCookie('token', cookieOptions);

@@ -162,6 +162,10 @@ class AuthService {
       }
 
       const allowedUpdates = [
+        'name',
+        'phone',
+        'bio',
+        'address',
         'dob',
         'gender',
         'preferredUtilities',
@@ -461,26 +465,39 @@ class AuthService {
 
   /**
    * @route POST /api/auth/change-password
-   * @description Change password
-   * @param {string} email - User email
+   * @description Change password for authenticated user
+   * @param {string} userId - User ID from JWT token
+   * @param {string} currentPassword - Current password to verify
+   * @param {string} newPassword - New password to set
    * @returns {Object} Change password result
    */
-  static async changePassword(email, newPassword) {
+  static async changePassword(userId, currentPassword, newPassword) {
     try {
-      const user = await User.findOne({ email });
+      // Must explicitly select password field since it has select: false
+      const user = await User.findById(userId).select('+password');
       if (!user) {
         throw new Error('User not found');
       }
 
+      // Verify current password
+      const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isPasswordValid) {
+        const error = new Error('Current password is incorrect');
+        error.code = 'INVALID_PASSWORD';
+        throw error;
+      }
+
+      // Hash and save new password
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(newPassword, salt);
       user.password = hashedPassword;
       await user.save();
 
+      logger.info('Password changed successfully', { userId: user._id });
       return { success: true };
     } catch (error) {
       logger.error('Change password error:', {
-        email,
+        userId,
         error: error.message,
         stack: error.stack,
       });

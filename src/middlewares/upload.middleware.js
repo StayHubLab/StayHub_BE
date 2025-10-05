@@ -37,6 +37,19 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// File filter for payment evidence (images and PDF)
+const paymentEvidenceFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|pdf/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/');
+  
+  if (mimetype && extname) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only images (jpg, png) and PDF files are allowed!'), false);
+  }
+};
+
 // Configure multer
 const upload = multer({
   storage: storage,
@@ -49,6 +62,18 @@ const upload = multer({
 
 // Middleware for room uploads (multiple images)
 const uploadRoomImages = upload.array('images', 10);
+
+// Configure multer for payment evidence (accepts images and PDF)
+const uploadPaymentConfig = multer({
+  storage: storage,
+  fileFilter: paymentEvidenceFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+});
+
+// Middleware for single payment evidence upload
+const uploadPaymentEvidence = uploadPaymentConfig.single('paymentEvidence');
 
 // Wrapper middleware with error handling
 const handleUpload = (req, res, next) => {
@@ -74,7 +99,29 @@ const handleUpload = (req, res, next) => {
   });
 };
 
+// Wrapper middleware for payment evidence with error handling
+const handlePaymentEvidenceUpload = (req, res, next) => {
+  uploadPaymentEvidence(req, res, (err) => {
+    if (err) {
+      logger.error('Payment evidence upload error:', err);
+      return res.status(400).json({
+        success: false,
+        message: 'Payment evidence upload error',
+        error: err.message,
+      });
+    }
+
+    if (req.file) {
+      logger.info('Payment evidence uploaded:', req.file.filename);
+    }
+
+    next();
+  });
+};
+
 module.exports = {
   handleUpload,
   uploadRoomImages,
+  handlePaymentEvidenceUpload,
+  uploadPaymentEvidence,
 };

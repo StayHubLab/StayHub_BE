@@ -44,6 +44,22 @@ const bookingSchema = new mongoose.Schema(
       default: 'unpaid',
     },
     notes: String,
+    // Deposit Payment Evidence Fields
+    depositEvidence: {
+      type: String, // Cloudinary URL
+    },
+    depositApprovalStatus: {
+      type: String,
+      enum: ['pending', 'pending_approval', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    depositReviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    depositReviewedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

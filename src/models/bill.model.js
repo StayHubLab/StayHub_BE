@@ -22,6 +22,17 @@ const BillSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    landlordId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User', // Landlord who created the bill
+      required: true,
+      index: true,
+    },
     amount: {
       rent: {
         type: Number,
@@ -71,13 +82,43 @@ const BillSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'paid', 'overdue', 'failed'],
+      enum: ['pending', 'pending_approval', 'paid', 'overdue', 'failed', 'rejected'],
       default: 'pending',
       index: true,
     },
-    paymentMethod: String,
+    paymentMethod: {
+      type: String,
+      enum: ['bank_transfer', 'cash', 'momo', 'other'],
+      default: 'bank_transfer',
+    },
     paidAt: Date,
     dueDate: Date,
+    // Payment Evidence Fields
+    paymentEvidence: {
+      type: String, // Cloudinary URL
+      default: null,
+    },
+    evidenceUploadedAt: {
+      type: Date,
+    },
+    // Approval Workflow Fields
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'pending_approval', 'approved', 'rejected'],
+      default: 'pending',
+      index: true,
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User', // Landlord who reviewed
+    },
+    reviewedAt: {
+      type: Date,
+    },
+    rejectionReason: {
+      type: String,
+      maxLength: 500,
+    },
   },
   {
     timestamps: true,
@@ -93,6 +134,11 @@ BillSchema.virtual('calculatedTotal').get(function () {
     (this.amount.service || 0)
   );
 });
+
+// Indexes for performance
+BillSchema.index({ landlordId: 1, approvalStatus: 1 });
+BillSchema.index({ renterId: 1, status: 1 });
+BillSchema.index({ approvalStatus: 1, createdAt: -1 });
 
 const Bill = mongoose.model('Bill', BillSchema);
 

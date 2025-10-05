@@ -39,7 +39,13 @@ exports.getBillById = async (req, res) => {
 // POST /api/bills
 exports.createBill = async (req, res) => {
   try {
-    const created = await BillService.createBill(req.body);
+    // Automatically set createdBy to the authenticated landlord
+    const billData = {
+      ...req.body,
+      createdBy: req.user._id // Get landlord ID from authenticated user
+    };
+    
+    const created = await BillService.createBill(billData);
     res.status(201).json({ success: true, message: 'Bill created successfully', data: created });
   } catch (error) {
     logger.error('Error creating bill:', error);
