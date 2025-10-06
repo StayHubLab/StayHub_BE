@@ -50,6 +50,12 @@ router.post(
   authController.login ||
     ((req, res) => res.status(500).json({ success: false, message: 'Handler missing: login' }))
 );
+router.post(
+  '/google-login',
+  authController.googleLogin ||
+    ((req, res) =>
+      res.status(500).json({ success: false, message: 'Handler missing: googleLogin' }))
+);
 router.get(
   '/verify-email/:token',
   authController.verifyEmail ||

@@ -178,6 +178,60 @@ exports.login = async (req, res) => {
 };
 
 /**
+ * @route POST /api/auth/google-login
+ * @category Auth Social
+ * @description Login or register via Google profile data (from GIS JWT)
+ * @param {Object} req.body - Google user data
+ * @param {string} req.body.email - Google email
+ * @param {string} req.body.name - Full name
+ * @param {string} req.body.picture - Avatar URL
+ * @param {string} req.body.googleId - Google subject (sub)
+ * @param {boolean} req.body.emailVerified - Email verified flag
+ */
+exports.googleLogin = async (req, res) => {
+  try {
+    const { email, name, picture, googleId, emailVerified } = req.body || {};
+
+    if (!email || !googleId) {
+      throw { code: 'MISSING_FIELDS', message: 'Google email and googleId are required' };
+    }
+    if (!validateEmail(email)) {
+      throw { code: 'INVALID_EMAIL', message: 'Invalid Google email' };
+    }
+
+    const result = await AuthService.loginWithGoogle({
+      email,
+      name,
+      picture,
+      googleId,
+      emailVerified,
+    });
+
+    // Set secure cookies similar to password login
+    res.cookie('token', result.token, {
+      ...cookieOptions,
+      maxAge: 15 * 60 * 1000,
+    });
+    res.cookie('refreshToken', result.refreshToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return formatResponse(res, {
+      message: 'Google login successful',
+      data: {
+        user: result.user,
+        token: result.token,
+        refreshToken: result.refreshToken,
+        expiresIn: 15 * 60,
+      },
+    });
+  } catch (error) {
+    handleError(error, res, 'Google login');
+  }
+};
+
+/**
  * @route POST /api/auth/logout
  * @category Auth Basic
  * @description Logout (delete token on client or server if using refresh)
