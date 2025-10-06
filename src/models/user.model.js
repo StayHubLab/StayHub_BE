@@ -17,6 +17,10 @@ const userSchema = new mongoose.Schema(
       enum: ['renter', 'landlord', 'technician', 'admin'],
       required: true,
     },
+    googleId: {
+      type: String,
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'Name is required'],

@@ -277,6 +277,78 @@ class AuthService {
   }
 
   /**
+   * @route POST /api/auth/google-login
+   * @description Login or create user using Google profile
+   * @param {Object} googleData
+   * @param {string} googleData.email
+   * @param {string} googleData.name
+   * @param {string} googleData.picture
+   * @param {string} googleData.googleId
+   * @param {boolean} googleData.emailVerified
+   * @returns {Object} { user, token, refreshToken }
+   */
+  static async loginWithGoogle(googleData) {
+    try {
+      const { email, name, picture, googleId, emailVerified } = googleData;
+
+      if (!email || !googleId) {
+        throw new Error('Missing Google email or id');
+      }
+
+      let user = await User.findOne({ email });
+
+      if (!user) {
+        user = new User({
+          name: name || email.split('@')[0],
+          email,
+          // Provide placeholder phone to satisfy schema (user can update later)
+          phone: '0000000000',
+          // Strong random-like password hash (not used for social login)
+          password: bcrypt.hashSync(jwt.sign({ email, t: Date.now() }, process.env.JWT_SECRET), 10),
+          // Provide non-empty address placeholders to satisfy schema
+          address: { street: 'N/A', ward: 'N/A', district: 'N/A', city: 'N/A' },
+          role: 'renter',
+          gender: 'other',
+          avatar: { url: picture || 'https://example.com/default-avatar.png' },
+          isVerified: !!emailVerified,
+          isBanned: false,
+          rating: 0,
+          googleId,
+        });
+        await user.save();
+      } else {
+        // Update minimal Google info if changed
+        let changed = false;
+        if (picture && user.avatar?.url !== picture) {
+          user.avatar = { ...(user.avatar || {}), url: picture };
+          changed = true;
+        }
+        if (typeof emailVerified === 'boolean' && user.isVerified !== emailVerified) {
+          user.isVerified = emailVerified;
+          changed = true;
+        }
+        if (!user.googleId && googleId) {
+          user.googleId = googleId;
+          changed = true;
+        }
+        if (changed) await user.save();
+      }
+
+      const token = await this.generateToken(user._id);
+      const refreshToken = this.generateRefreshToken(user._id);
+
+      return { user: this.formatUserResponse(user), token, refreshToken };
+    } catch (error) {
+      logger.error('Google login error:', {
+        email: googleData?.email,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * @route GET /api/auth/me
    * @description Get user profile
    * @param {string} userId - User ID
