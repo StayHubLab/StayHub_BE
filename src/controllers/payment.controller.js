@@ -1,136 +1,231 @@
+/**
+ * @fileoverview Payment Controller - Handles manual payment verification
+ * @created 2025-10-05
+ * @file payment.controller.js
+ * @description Controller for manual bank transfer payment verification
+ */
+
 const BillService = require('../services/bill.service');
 const Bill = require('../models/bill.model');
+const cloudinaryService = require('../services/cloudinary.service');
+const logger = require('../utils/logger');
 
-function getClientIp(req) {
-  const ip =
-    (req.headers['x-forwarded-for'] || '').split(',')[0] ||
-    req.connection?.remoteAddress ||
-    req.socket?.remoteAddress ||
-    (req.connection && req.connection.socket && req.connection.socket.remoteAddress) ||
-    '127.0.0.1';
-  return ip.replace('::ffff:', '') || '127.0.0.1';
-}
-
-async function getVNPayInstance() {
-  // Validate required env
-  const tmnCode = process.env.VNP_TMN_CODE || process.env.VNPAY_TMN_CODE;
-  const secureSecret = process.env.VNP_HASH_SECRET;
-  const vnpHost = process.env.VNP_HOST || 'https://sandbox.vnpayment.vn';
-  const testMode = String(process.env.VNP_TEST_MODE || 'true') === 'true';
-  const hashAlgorithm = process.env.VNP_HASH_ALG || 'SHA512';
-  if (!tmnCode || !secureSecret) {
-    const err = new Error(
-      'VNPay config missing: set VNP_TMN_CODE and VNP_HASH_SECRET in environment'
-    );
-    err.code = 'VNP_CONFIG_MISSING';
-    throw err;
-  }
-  const mod = await import('../vnpay/vnpay.js');
-  const VNPayClass = mod.VNPay || mod.default;
-  const vnpay = new VNPayClass({
-    tmnCode,
-    secureSecret,
-    vnpayHost: vnpHost,
-    testMode,
-    hashAlgorithm,
-    enableLog: false,
-  });
-  return vnpay;
-}
-
-exports.createVNPayPayment = async (req, res) => {
+/**
+ * Upload payment evidence
+ * @route POST /api/payments/upload-evidence
+ * @access Renter only
+ */
+exports.uploadPaymentEvidence = async (req, res) => {
   try {
-    const { billId } = req.query;
-    if (!billId) return res.status(400).json({ success: false, message: 'billId is required' });
-    const bill = await Bill.findById(billId).lean();
-    if (!bill) return res.status(404).json({ success: false, message: 'Bill not found' });
-    if (bill.status === 'paid')
-      return res.status(400).json({ success: false, message: 'Bill already paid' });
+    const { billId } = req.body;
+    const userId = req.user._id;
 
-    const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
-    const returnUrl = `${baseUrl}/api/payments/vnpay/return`;
-    const ipnUrl = `${baseUrl}/api/payments/vnpay/ipn`;
+    if (!billId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bill ID is required',
+      });
+    }
 
-    const vnpay = await getVNPayInstance();
-    const txnRef = String(bill._id);
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment evidence file is required',
+      });
+    }
 
-    // Pass amount in VND (no x100) to avoid displaying x100 on gateway
-    const amount = Math.round(bill.totalAmount || 0);
-    const url = vnpay.buildPaymentUrl(
-      {
-        vnp_Amount: amount,
-        vnp_IpAddr: getClientIp(req),
-        vnp_TxnRef: txnRef,
-        vnp_ReturnUrl: returnUrl,
-        vnp_OrderInfo: `Thanh toan hoa don ${txnRef}`,
-      },
-      {
-        vnp_IpnUrl: ipnUrl,
-        vnp_BankCode: undefined,
-      }
-    );
+    // Upload to Cloudinary
+    let evidenceUrl;
+    try {
+      const result = await cloudinaryService.uploadImage(req.file.path, {
+        folder: 'stayhub/payment-evidence',
+        resource_type: 'auto', // Accepts images and PDFs
+      });
+      evidenceUrl = result.data.secure_url;
+    } catch (uploadError) {
+      logger.error('Cloudinary upload failed:', uploadError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to upload payment evidence',
+        error: uploadError.message,
+      });
+    }
 
-    res.json({ success: true, data: { paymentUrl: url } });
+    // Save evidence URL to bill
+    const updatedBill = await BillService.uploadPaymentEvidence(billId, evidenceUrl, userId);
+
+    res.json({
+      success: true,
+      message: 'Payment evidence uploaded successfully',
+      data: updatedBill,
+    });
   } catch (error) {
-    const msg = error?.code === 'VNP_CONFIG_MISSING' ? error.message : 'Cannot create payment';
-    res.status(500).json({ success: false, message: msg, error: error.message });
+    logger.error('Payment evidence upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to upload payment evidence',
+    });
   }
 };
 
-exports.vnpayReturn = async (req, res) => {
+/**
+ * Get payment evidence details
+ * @route GET /api/payments/:paymentId
+ * @access Authenticated users
+ */
+exports.getPaymentEvidence = async (req, res) => {
   try {
-    const vnpay = await getVNPayInstance();
-    const verify = vnpay.verifyReturnUrl(req.query);
-    const code = verify.vnp_ResponseCode || verify.vnpayResponseCode;
-    const feBase = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
-    const successUrl = feBase
-      ? `${feBase}/main/payment-result?status=success&bill=${encodeURIComponent(
-          req.query.vnp_TxnRef || ''
-        )}`
-      : '/main/payment-result?status=success';
-    const failUrl = feBase
-      ? `${feBase}/main/payment-result?status=failed&reason=${encodeURIComponent(
-          code || 'unknown'
-        )}`
-      : '/main/payment-result?status=failed';
-    if (verify.isSuccess && (code === '00' || code === 0)) {
-      const billId = req.query.vnp_TxnRef;
-      await BillService.markBillPaid(billId, { paymentMethod: 'vnpay' });
-      return res.redirect(successUrl);
+    const { paymentId } = req.params;
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    const bill = await Bill.findById(paymentId)
+      .populate('contractId')
+      .populate('renterId', 'name email phone')
+      .populate('landlordId', 'name email phone')
+      .populate('reviewedBy', 'name email');
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found',
+      });
     }
-    // Mark failed if return is not success
-    if (req.query.vnp_TxnRef) {
-      try {
-        await require('../services/bill.service').updateBill?.(req.query.vnp_TxnRef, {
-          status: 'failed',
-        });
-      } catch (_) {}
+
+    // Authorization check
+    const isRenter = bill.renterId && bill.renterId._id.toString() === userId.toString();
+    const isLandlord = bill.landlordId && bill.landlordId._id.toString() === userId.toString();
+    const isAdmin = userRole === 'admin';
+
+    if (!isRenter && !isLandlord && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to view this payment',
+      });
     }
-    return res.redirect(failUrl);
+
+    res.json({
+      success: true,
+      data: bill,
+    });
   } catch (error) {
-    const feBase = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
-    const failUrl = feBase
-      ? `${feBase}/main/payment-result?status=failed&reason=exception`
-      : '/main/payment-result?status=failed';
-    return res.redirect(failUrl);
+    logger.error('Get payment evidence error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get payment details',
+    });
   }
 };
 
-exports.vnpayIpn = async (req, res) => {
+/**
+ * Approve payment evidence
+ * @route PUT /api/payments/:paymentId/approve
+ * @access Landlord only
+ */
+exports.approvePayment = async (req, res) => {
   try {
-    const vnpay = await getVNPayInstance();
-    const verified = vnpay.verifyIpnCall(req.query);
-    if (!verified.isSuccess) {
-      return res.json({ RspCode: '97', Message: 'Checksum failed' });
-    }
-    const code = verified.vnp_ResponseCode || verified.vnpayResponseCode;
-    if (code === '00' || code === 0) {
-      const billId = req.query.vnp_TxnRef;
-      await BillService.markBillPaid(billId, { paymentMethod: 'vnpay' });
-      return res.json({ RspCode: '00', Message: 'Confirm Success' });
-    }
-    return res.json({ RspCode: '01', Message: 'Payment failed' });
+    const { paymentId } = req.params;
+    const { notes } = req.body;
+    const landlordId = req.user._id;
+
+    const approvedBill = await BillService.approvePayment(paymentId, landlordId, notes);
+
+    res.json({
+      success: true,
+      message: 'Payment approved successfully',
+      data: approvedBill,
+    });
   } catch (error) {
-    return res.json({ RspCode: '99', Message: 'Unknown error' });
+    logger.error('Approve payment error:', error);
+    res.status(error.code === 'VALIDATION_ERROR' ? 400 : 500).json({
+      success: false,
+      message: error.message || 'Failed to approve payment',
+    });
+  }
+};
+
+/**
+ * Reject payment evidence
+ * @route PUT /api/payments/:paymentId/reject
+ * @access Landlord only
+ */
+exports.rejectPayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { reason } = req.body;
+    const landlordId = req.user._id;
+
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rejection reason is required',
+      });
+    }
+
+    const rejectedBill = await BillService.rejectPayment(paymentId, landlordId, reason);
+
+    res.json({
+      success: true,
+      message: 'Payment rejected successfully',
+      data: rejectedBill,
+    });
+  } catch (error) {
+    logger.error('Reject payment error:', error);
+    res.status(error.code === 'VALIDATION_ERROR' ? 400 : 500).json({
+      success: false,
+      message: error.message || 'Failed to reject payment',
+    });
+  }
+};
+
+/**
+ * Get payments by approval status
+ * @route GET /api/payments/status/:status
+ * @access Landlord only
+ */
+exports.getPaymentsByStatus = async (req, res) => {
+  try {
+    const { status } = req.params;
+    const landlordId = req.user._id;
+
+    const bills = await BillService.getPaymentsByApprovalStatus(landlordId, status);
+
+    res.json({
+      success: true,
+      data: bills,
+      count: bills.length,
+    });
+  } catch (error) {
+    logger.error('Get payments by status error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get payments',
+    });
+  }
+};
+
+/**
+ * Get renter's own payment history
+ * @route GET /api/payments/my-payments
+ * @access Renter only
+ */
+exports.getMyPayments = async (req, res) => {
+  try {
+    const renterId = req.user._id;
+    const { status } = req.query;
+
+    const bills = await BillService.getBillsByRenterId(renterId, { status });
+
+    res.json({
+      success: true,
+      data: bills,
+      count: bills.length,
+    });
+  } catch (error) {
+    logger.error('Get my payments error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get payment history',
+    });
   }
 };

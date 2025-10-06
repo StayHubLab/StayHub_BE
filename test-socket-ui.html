@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StayHub Real-time Chat Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 12px; 
+            overflow: hidden; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 20px; 
+            text-align: center; 
+        }
+        .controls { 
+            padding: 20px; 
+            border-bottom: 1px solid #eee; 
+        }
+        .control-group { 
+            margin-bottom: 15px; 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+        }
+        .control-group label { 
+            min-width: 120px; 
+            font-weight: 600; 
+        }
+        .control-group input { 
+            flex: 1; 
+            padding: 8px 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 6px; 
+            font-size: 14px; 
+        }
+        .control-group button { 
+            padding: 8px 16px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 14px; 
+        }
+        .control-group button:hover { 
+            background: #0056b3; 
+        }
+        .control-group button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed; 
+        }
+        .status { 
+            padding: 10px 20px; 
+            font-weight: 600; 
+            text-align: center; 
+        }
+        .status.connected { 
+            background: #d4edda; 
+            color: #155724; 
+        }
+        .status.disconnected { 
+            background: #f8d7da; 
+            color: #721c24; 
+        }
+        .status.connecting { 
+            background: #fff3cd; 
+            color: #856404; 
+        }
+        .chat-area { 
+            display: flex; 
+            height: 400px; 
+        }
+        .chat-box { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            border-right: 1px solid #eee; 
+        }
+        .chat-box:last-child { 
+            border-right: none; 
+        }
+        .chat-header { 
+            padding: 10px 20px; 
+            background: #f8f9fa; 
+            border-bottom: 1px solid #eee; 
+            font-weight: 600; 
+        }
+        .messages { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 10px; 
+            background: #fafafa; 
+        }
+        .message { 
+            margin-bottom: 8px; 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            font-size: 13px; 
+            line-height: 1.4; 
+        }
+        .message.info { 
+            background: #e3f2fd; 
+            color: #1565c0; 
+        }
+        .message.success { 
+            background: #e8f5e8; 
+            color: #2e7d32; 
+        }
+        .message.error { 
+            background: #ffebee; 
+            color: #c62828; 
+        }
+        .message.received { 
+            background: #fff; 
+            border: 1px solid #e0e0e0; 
+        }
+        .message.sent { 
+            background: #007bff; 
+            color: white; 
+            margin-left: 40px; 
+        }
+        .chat-input { 
+            padding: 10px; 
+            border-top: 1px solid #eee; 
+            display: flex; 
+            gap: 10px; 
+        }
+        .chat-input input { 
+            flex: 1; 
+            padding: 8px 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 6px; 
+        }
+        .logs { 
+            padding: 20px; 
+            background: #f8f9fa; 
+            max-height: 200px; 
+            overflow-y: auto; 
+            font-family: 'Courier New', monospace; 
+            font-size: 12px; 
+            border-top: 1px solid #eee; 
+        }
+        .log { 
+            margin-bottom: 5px; 
+            padding: 2px 0; 
+        }
+        .log.error { 
+            color: #dc3545; 
+        }
+        .log.success { 
+            color: #28a745; 
+        }
+        .typing-indicator { 
+            font-style: italic; 
+            color: #666; 
+            padding: 5px 10px; 
+            font-size: 12px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 StayHub Real-time Chat Test</h1>
+            <p>Test Socket.IO real-time messaging functionality</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>JWT Token:</label>
+                <input type="text" id="tokenInput" placeholder="Paste your JWT token here...">
+                <button onclick="connect()" id="connectBtn">Connect</button>
+                <button onclick="disconnect()" id="disconnectBtn" disabled>Disconnect</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Conversation ID:</label>
+                <input type="text" id="conversationInput" placeholder="Enter conversation ID...">
+                <button onclick="joinConversation()" id="joinBtn" disabled>Join</button>
+                <button onclick="createConversation()" id="createBtn" disabled>Create New</button>
+            </div>
+        </div>
+
+        <div class="status disconnected" id="status">
+            🔴 Disconnected - Enter token and click Connect
+        </div>
+
+        <div class="chat-area">
+            <div class="chat-box">
+                <div class="chat-header">💬 Chat Messages</div>
+                <div class="messages" id="messages"></div>
+                <div class="typing-indicator" id="typingIndicator"></div>
+                <div class="chat-input">
+                    <input type="text" id="messageInput" placeholder="Type message..." disabled>
+                    <button onclick="sendMessage()" id="sendBtn" disabled>Send</button>
+                    <button onclick="toggleTyping()" id="typingBtn" disabled>Typing</button>
+                </div>
+            </div>
+
+            <div class="chat-box">
+                <div class="chat-header">📊 System Events</div>
+                <div class="messages" id="events"></div>
+            </div>
+        </div>
+
+        <div class="logs" id="logs">
+            <strong>📝 Connection Logs:</strong><br>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentConversation = null;
+        let isTyping = false;
+        let typingTimeout = null;
+
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function addMessage(content, type = 'info', container = 'messages') {
+            const messagesDiv = document.getElementById(container);
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${type}`;
+            messageEl.innerHTML = content;
+            messagesDiv.appendChild(messageEl);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateStatus(status, className) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = status;
+            statusEl.className = `status ${className}`;
+        }
+
+        function updateUI(connected, joined = false) {
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('joinBtn').disabled = !connected;
+            document.getElementById('createBtn').disabled = !connected;
+            document.getElementById('messageInput').disabled = !joined;
+            document.getElementById('sendBtn').disabled = !joined;
+            document.getElementById('typingBtn').disabled = !joined;
+        }
+
+        async function connect() {
+            const token = document.getElementById('tokenInput').value.trim();
+            if (!token) {
+                alert('Please enter JWT token');
+                return;
+            }
+
+            updateStatus('🟡 Connecting...', 'connecting');
+            log('🔌 Attempting to connect...', 'info');
+
+            try {
+                socket = io('http://localhost:5000', {
+                    auth: { token }
+                });
+
+                socket.on('connect', () => {
+                    updateStatus('🟢 Connected', 'connected');
+                    updateUI(true);
+                    log('✅ Connected successfully! Socket ID: ' + socket.id, 'success');
+                    addMessage('✅ Connected to server', 'success', 'events');
+                });
+
+                socket.on('connect_error', (error) => {
+                    updateStatus('🔴 Connection Error', 'disconnected');
+                    updateUI(false);
+                    log('❌ Connection error: ' + error.message, 'error');
+                    addMessage('❌ Connection failed: ' + error.message, 'error', 'events');
+                });
+
+                socket.on('disconnect', () => {
+                    updateStatus('🔴 Disconnected', 'disconnected');
+                    updateUI(false, false);
+                    log('🔌 Disconnected from server', 'info');
+                    addMessage('🔌 Disconnected from server', 'info', 'events');
+                });
+
+                socket.on('newMessage', (message) => {
+                    log('📩 Message received from ' + message.sender.name, 'success');
+                    addMessage(`<strong>${message.sender.name}:</strong> ${message.content}`, 'received');
+                });
+
+                socket.on('userTyping', ({ userName, isTyping }) => {
+                    const indicator = document.getElementById('typingIndicator');
+                    if (isTyping) {
+                        indicator.textContent = `${userName} is typing...`;
+                        log('⌨️ ' + userName + ' is typing', 'info');
+                    } else {
+                        indicator.textContent = '';
+                    }
+                });
+
+                socket.on('userOnline', ({ userName }) => {
+                    addMessage(`🟢 ${userName} is online`, 'success', 'events');
+                });
+
+                socket.on('userOffline', ({ userName }) => {
+                    addMessage(`🔴 ${userName} is offline`, 'info', 'events');
+                });
+
+                socket.on('error', (error) => {
+                    log('❌ Socket error: ' + error.message, 'error');
+                    addMessage('❌ Error: ' + error.message, 'error', 'events');
+                });
+
+            } catch (error) {
+                log('❌ Failed to create socket: ' + error.message, 'error');
+                updateStatus('🔴 Failed to Connect', 'disconnected');
+            }
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                currentConversation = null;
+                log('🔌 Manually disconnected', 'info');
+            }
+        }
+
+        function joinConversation() {
+            const conversationId = document.getElementById('conversationInput').value.trim();
+            if (!conversationId || !socket) {
+                alert('Please enter conversation ID and connect first');
+                return;
+            }
+
+            currentConversation = conversationId;
+            socket.emit('joinConversation', conversationId);
+            log('🚪 Joining conversation: ' + conversationId, 'info');
+            addMessage('🚪 Joined conversation: ' + conversationId, 'success', 'events');
+            updateUI(true, true);
+        }
+
+        async function createConversation() {
+            if (!socket) {
+                alert('Please connect first');
+                return;
+            }
+
+            const token = document.getElementById('tokenInput').value.trim();
+            const recipientId = prompt('Enter recipient user ID:');
+            
+            if (!recipientId) return;
+
+            try {
+                const response = await fetch('http://localhost:5000/api/chat/conversations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ recipientId })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    const convId = result.data.conversation._id;
+                    document.getElementById('conversationInput').value = convId;
+                    log('✅ Conversation created: ' + convId, 'success');
+                    addMessage('✅ Conversation created: ' + convId, 'success', 'events');
+                } else {
+                    log('❌ Failed to create conversation: ' + result.message, 'error');
+                    alert('Failed to create conversation: ' + result.message);
+                }
+            } catch (error) {
+                log('❌ Error creating conversation: ' + error.message, 'error');
+                alert('Error creating conversation: ' + error.message);
+            }
+        }
+
+        function sendMessage() {
+            const content = document.getElementById('messageInput').value.trim();
+            if (!content || !currentConversation || !socket) return;
+
+            socket.emit('sendMessage', {
+                conversationId: currentConversation,
+                content
+            });
+
+            addMessage(`<strong>You:</strong> ${content}`, 'sent');
+            document.getElementById('messageInput').value = '';
+            log('📤 Message sent: ' + content, 'info');
+
+            // Stop typing
+            if (isTyping) {
+                socket.emit('typing', {
+                    conversationId: currentConversation,
+                    isTyping: false
+                });
+                isTyping = false;
+            }
+        }
+
+        function toggleTyping() {
+            if (!currentConversation || !socket) return;
+
+            isTyping = !isTyping;
+            socket.emit('typing', {
+                conversationId: currentConversation,
+                isTyping
+            });
+
+            log('⌨️ Typing ' + (isTyping ? 'started' : 'stopped'), 'info');
+
+            if (isTyping) {
+                // Auto stop typing after 3 seconds
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    if (isTyping) {
+                        socket.emit('typing', {
+                            conversationId: currentConversation,
+                            isTyping: false
+                        });
+                        isTyping = false;
+                        log('⌨️ Auto-stopped typing', 'info');
+                    }
+                }, 3000);
+            }
+        }
+
+        // Auto-typing detection
+        document.getElementById('messageInput').addEventListener('input', function() {
+            if (!currentConversation || !socket) return;
+
+            if (!isTyping) {
+                isTyping = true;
+                socket.emit('typing', {
+                    conversationId: currentConversation,
+                    isTyping: true
+                });
+            }
+
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                if (isTyping) {
+                    socket.emit('typing', {
+                        conversationId: currentConversation,
+                        isTyping: false
+                    });
+                    isTyping = false;
+                }
+            }, 1000);
+        });
+
+        // Send message on Enter
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Page load
+        window.onload = function() {
+            log('🎯 Chat test interface loaded', 'info');
+            log('💡 Instructions:', 'info');
+            log('1. Login to get JWT token', 'info');
+            log('2. Paste token and click Connect', 'info');
+            log('3. Enter conversation ID or create new', 'info');
+            log('4. Start chatting!', 'info');
+        };
+    </script>
+</body>
+</html>

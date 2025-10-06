@@ -88,6 +88,20 @@ const userSchema = new mongoose.Schema(
       enum: ['male', 'female', 'other'],
       default: 'other',
     },
+        bankInfo: {
+          bankName: {
+            type: String,
+            trim: true,
+            required: false, // để optional, user có thể thêm sau
+          },
+          accountNumber: {
+            type: String,
+            trim: true,
+            match: [/^\d{6,20}$/, 'Account number must be between 6 and 20 digits'],
+            required: false,
+          },
+        },
+
     preferredUtilities: {
       type: [String],
       validate: {

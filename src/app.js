@@ -32,7 +32,8 @@ const billRoutes = require('./routes/bill.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const viewingRoutes = require('./routes/viewing.routes');
 const savedRoomRoutes = require('./routes/saved-room.routes');
-
+const chatRoutes = require('./routes/chat.routes');
+const reviewRoutes = require('./routes/review.routes');
 // Import middleware
 const { auth } = require('./middlewares/auth.middleware');
 
@@ -44,11 +45,11 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
+        defaultSrc: ['self'],
+        scriptSrc: ['self', 'unsafe-inline'],
+        styleSrc: ['self', 'unsafe-inline'],
+        imgSrc: ['self', 'data:', 'https:'],
+        connectSrc: ['self'],
       },
     },
   })
@@ -77,9 +78,20 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'http://localhost:5173',
+  'http://localhost:5500',   // Added this!
+  'http://127.0.0.1:5500',
+  'http://127.0.0.1:3000',
+  'http://localhost:8080',
+  process.env.CORS_ORIGIN
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: true, // Allow all origins in development
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -139,6 +151,8 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // DEBUG: list all registered routes (temp) -----------------
 if (process.env.LIST_ROUTES === 'true') {
@@ -225,9 +239,28 @@ const startServer = async () => {
     }
     const PORT = process.env.PORT || 5000;
 
-    const server = app.listen(PORT, () => {
-      logger.info(`Server is running on port ${PORT}`);
-    });
+  // Khởi tạo HTTP server
+const server = app.listen(PORT, () => {
+  logger.info(`Server is running on port ${PORT}`);
+});
+
+// Tạo socket server gắn vào server HTTP
+const { Server } = require('socket.io');
+const io = new Server(server, {
+  cors: {
+    origin: true, // Allow all origins in development
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+});
+
+// 👇 Gắn io vào app để controller có thể lấy bằng req.app.get('io')
+app.set('io', io);
+
+// Import file quản lý socket
+const initSocket = require('./socket/socket');
+initSocket(io);
+
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
