@@ -688,7 +688,9 @@ const emailTemplates = {
                   <div style="display:block;">
                     <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
                       <div style="min-width:130px; color:#6b7280; font-weight:600;">Mã hóa đơn:</div>
-                      <div style="color:#111827; font-weight:600;">#${data.billId || 'N/A'}</div>
+                      <div style="color:#111827; font-weight:600;">#${
+                        data.billId ? data.billId.substring(data.billId.length - 8) : 'N/A'
+                      }</div>
                     </div>
                     <div style="display:flex; padding:10px 0; border-top:1px solid #eef2f7;">
                       <div style="min-width:130px; color:#6b7280; font-weight:600;">Tháng/Năm:</div>
@@ -774,7 +776,17 @@ const emailTemplates = {
                     </div>
                     <div style="display:flex; padding:10px 0; border-top:2px solid #0ea5e9; background-color:#e0f2fe;">
                       <div style="min-width:130px; color:#0c4a6e; font-weight:800; font-size:16px;">TỔNG CỘNG:</div>
-                      <div style="color:#0c4a                  <ul style="margin:0; padding-left:18px; color:#7c2d12; line-height:1.8; font-size:14px;">
+                      <div style="color:#0c4a6e; font-weight:800; font-size:16px;">${formatPrice(
+                        data.totalAmount || 0
+                      )}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Notes -->
+                <div style="background-color:#fef3c7; border:1px solid #f59e0b; border-radius:12px; padding:18px; margin-bottom:22px;">
+                  <h3 style="margin:0 0 10px 0; color:#92400e; font-size:14px; font-weight:700;">📝 Lưu ý quan trọng:</h3>
+                  <ul style="margin:0; padding-left:18px; color:#7c2d12; line-height:1.8; font-size:14px;">
                     <li>Vui lòng thanh toán trước hạn để tránh bị phạt hoặc gián đoạn dịch vụ</li>
                     <li>Giữ biên lai thanh toán để đối chiếu nếu cần thiết</li>
                     <li>Nếu có bất kỳ vấn đề nào, liên hệ với chủ trọ hoặc bộ phận hỗ trợ StayHub</li>
