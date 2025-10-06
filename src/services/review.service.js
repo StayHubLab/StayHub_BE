@@ -25,7 +25,7 @@ class ReviewService {
       throw { code: 'ROOM_NOT_FOUND', message: 'Room not found' };
     }
 
-    const landlordId = room.buildingId?.hostId;
+    const landlordId = room.buildingId?.ownerId;
     if (!landlordId) {
       throw { code: 'LANDLORD_NOT_FOUND', message: 'Landlord information not found for this room' };
     }
@@ -279,10 +279,7 @@ class ReviewService {
     const landlordReviews = await Review.getLandlordAverageRating(landlordId);
     
     // All room reviews for this landlord's rooms
-    const Building = require('../models/building.model');
-    const buildings = await Building.find({ hostId: landlordId });
-    const buildingIds = buildings.map(b => b._id);
-    const rooms = await Room.find({ buildingId: { $in: buildingIds } });
+    const rooms = await Room.find({ 'buildingId.ownerId': landlordId });
     const roomIds = rooms.map(r => r._id);
     
     const roomReviewsStats = await Review.aggregate([
