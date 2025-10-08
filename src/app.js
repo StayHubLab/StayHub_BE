@@ -91,7 +91,7 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: true, // Allow all origins in development
+    origin: 'https://stay-hub-fe.vercel.app', // Allow all origins in development
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
