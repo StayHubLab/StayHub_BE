@@ -24,12 +24,12 @@
     "mongoose": "^7.8.7",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.3",
+    "nodemon": "^2.0.22",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "eslint": "^8.38.0",
-    "nodemon": "^2.0.22",
     "prettier": "^2.8.7"
   },
   "engines": {
