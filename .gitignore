@@ -49,3 +49,14 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+
+# Deployment
+.env.production
+.env.staging
+deploy-*.log
+
+# Heroku
+.heroku/
+
+# Uploads (if containing sensitive data)
+uploads/
